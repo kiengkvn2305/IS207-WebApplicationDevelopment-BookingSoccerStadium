@@ -1,0 +1,8 @@
+# Phòng khi ai đó trỏ web root vào thư mục gốc: chặn file ẩn và thư mục nội bộ
+Options -Indexes
+<FilesMatch "^\.(env|git)">
+    Require all denied
+</FilesMatch>
+RedirectMatch 404 ^/.*/(app|database)/
+RewriteEngine On
+RewriteRule ^$ %{REQUEST_URI}public/ [R=302,L]

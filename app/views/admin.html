@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/style.css">
+    <title>Quản trị viên</title>
+  </head>
+  <body>
+    <header class="top slim">
+      <div class="wrap navrow">
+        <h1>Sân Nhà</h1>
+        <div class="who">
+          <span id="whoami"></span>
+          <button class="btn ghost light" id="logoutBtn">Đăng xuất</button>
+        </div>
+      </div>
+    </header>
+    <main class="wrap">
+      <p id="flash" class="flash" hidden role="status"></p>
+        <section>
+          <h2>Tổng quan</h2>
+          <div class="stats" id="stats"></div>
+        </section>
+      <section><h2>Tài khoản</h2>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tên</th>
+                <th>Email</th>
+                <th>Vai trò</th>
+                <th>Trạng thái</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="userRows"></tbody>
+          </table>
+        </div>
+      </section>
+      <section><h2>Đơn gần đây</h2>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Mã</th>
+                <th>Khách</th>
+                <th>Chủ sân</th>
+                <th>Sân</th>
+                <th>Ngày</th>
+                <th>Tiền</th>
+                <th>Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody id="bookingRows"></tbody>
+          </table>
+        </div>
+      </section>
+      <section><h2>Đánh giá khách hàng</h2>
+        <p class="hint">Ẩn đánh giá vi phạm hoặc hiển thị lại sau khi kiểm tra. Đánh giá chỉ được gửi bởi khách có đơn đã thanh toán.</p>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Cụm sân</th><th>Khách hàng</th><th>Sao</th><th>Bình luận</th><th>Trạng thái</th><th></th></tr></thead>
+            <tbody id="reviewRows"></tbody>
+          </table>
+        </div>
+      </section>
+      <section><h2>Nhật ký hoạt động</h2>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Thời gian</th>
+                <th>Tài khoản</th>
+                <th>Hành động</th>
+                <th>Chi tiết</th>
+                <th>IP</th>
+              </tr>
+            </thead>
+            <tbody id="logRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+<script src="assets/js/app.js"></script><script src="assets/js/admin.js"></script>
+</body></html>
