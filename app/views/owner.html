@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css"><title>Chủ sân</title></head><body>
+<header class="top slim"><div class="wrap navrow"><h1>Bóng đá quanh ta</h1>
+  <div class="who"><div class="account-menu" id="accountMenu" hidden>
+    <button class="btn ghost light account-trigger" id="accountBtn" type="button" aria-haspopup="true" aria-expanded="false">
+      <span id="whoami"></span><span class="account-chevron" aria-hidden="true"></span>
+    </button>
+    <div class="account-dropdown" id="accountDropdown" hidden>
+      <button class="account-menu-item" id="profileBtn" type="button">Thông tin cá nhân</button>
+      <button class="account-menu-item account-logout" id="logoutBtn" type="button">Đăng xuất</button>
+    </div>
+  </div></div></div></header>
+<main class="wrap">
+<p id="flash" class="flash" hidden role="status"></p>
+<section id="matchAlertSection" hidden aria-labelledby="matchAlertHeading">
+  <h2 id="matchAlertHeading">Thông báo kèo sắp bắt đầu</h2>
+  <p class="payment-warning">Các kèo dưới đây còn không quá 2 tiếng nhưng chưa có đối thủ chấp nhận. Chủ sân vui lòng liên hệ đội đăng kèo để hỗ trợ tìm đối thủ.</p>
+  <div id="matchAlerts" class="match-alert-list" aria-live="assertive"></div>
+</section>
+<section><h2>Tài khoản nhận phí hủy</h2>
+  <p id="noBank" class="flash err" hidden>Bạn chưa nhập tài khoản ngân hàng nên sân chưa hiển thị cho khách đặt.</p>
+  <form id="bankForm" class="panel grid2">
+    <label>Tên cụm sân<input name="venue_name" required maxlength="100"></label>
+    <label>Địa chỉ<input name="address" maxlength="200"></label>
+    <label>Ngân hàng<select name="bank_bin" id="bankSel" required><option value="">— Chọn —</option></select></label>
+    <label>Số tài khoản<input name="account_no" required inputmode="numeric" pattern="\d{6,19}"></label>
+    <label>Tên chủ tài khoản (HOA, không dấu)<input name="account_name" required pattern="[A-Za-z ]{3,60}"></label>
+    <div class="end"><button class="btn">Lưu thông tin</button></div>
+  </form>
+  <p class="hint">Khách không cần thanh toán trước khi đặt sân. Tài khoản này dùng để nhận phí hủy (70% tiền sân nếu khách hủy trong vòng 2 giờ trước giờ đá).</p>
+  <p id="paymentAutomationNotice" class="payment-warning" hidden></p>
+</section>
+<section><h2>Hình ảnh và tiện ích cụm sân</h2>
+  <p class="hint">Tải tối đa 8 ảnh JPG, PNG hoặc WebP (mỗi ảnh tối đa 5 MB) để khách xem nhiều góc nhìn.</p>
+  <div id="venueGallery" class="venue-gallery" aria-live="polite"></div>
+  <label class="upload-btn venue-image-upload">Thêm ảnh cụm sân (tối đa 8 ảnh)
+    <input id="venueImageFile" type="file" accept="image/jpeg,image/png,image/webp">
+  </label>
+  <form id="amenityForm" class="panel">
+    <fieldset><legend>Tiện ích hiện có</legend><div id="amenityChoices" class="amenity-choices"></div></fieldset>
+    <div class="end"><button class="btn">Lưu tiện ích</button></div>
+  </form>
+</section>
+<section><h2>Sân của tôi</h2>
+  <div class="tablewrap"><table><thead><tr><th>Ảnh</th><th>Sân</th><th>Loại</th><th>Giá thường</th><th>Giá cao điểm</th><th>Trạng thái</th><th></th></tr></thead><tbody id="pitchRows"></tbody></table></div>
+  <form id="pitchForm" class="panel grid2">
+    <label>Tên sân<input name="name" required maxlength="60"></label>
+    <label>Loại<select name="type"><option>Sân 5 người</option><option>Sân 7 người</option><option>Sân 11 người</option></select></label>
+    <label>Giá thường (đ/giờ)<input name="price" type="number" min="10000" step="10000" required></label>
+    <label>Giá cao điểm từ 17:00 (đ/giờ)<input name="peak_price" type="number" min="10000" step="10000" required></label>
+    <div class="end"><button class="btn">Thêm sân</button></div>
+  </form>
+</section>
+<section><h2>Quản lý khung giờ</h2>
+  <p class="hint">Chọn ngày và sân, sau đó bấm giờ còn trống để gỡ giờ đó khỏi lịch khách đặt. Giờ đã có người đặt không thể gỡ.</p>
+  <div class="panel grid2 slot-manager">
+    <label>Sân<select id="schedulePitch"></select></label>
+    <label>Ngày<input id="scheduleDate" type="date"></label>
+    <div id="scheduleSlots" class="schedule-slots"></div>
+  </div>
+</section>
+<section><h2>Đơn đặt sân</h2>
+  <div class="tablewrap"><table><thead><tr><th>Mã</th><th>Khách</th><th>Sân</th><th>Ngày giờ</th><th>Tiền</th><th>Trạng thái</th><th></th></tr></thead><tbody id="bookingRows"></tbody></table></div>
+</section>
+</main>
+<dialog id="profileDlg" class="profile-dialog">
+  <div class="profile-dialog-head"><div><p class="eyebrow">TÀI KHOẢN CỦA BẠN</p><h3>Thông tin cá nhân</h3></div>
+    <button class="dialog-close" id="profileCloseIcon" type="button" aria-label="Đóng">×</button></div>
+  <form id="profileForm" class="profile-form">
+    <div class="profile-fields">
+      <label>Họ và tên<input id="profileName" name="name" required minlength="2" maxlength="60" autocomplete="name"></label>
+      <label>Email<input id="profileEmail" name="email" type="email" required maxlength="120" autocomplete="email"></label>
+      <label>Số điện thoại<input id="profilePhone" name="phone" type="tel" required pattern="(0|\+84)\d{9}" autocomplete="tel"></label>
+      <label>Loại tài khoản<input id="profileRole" type="text" readonly aria-describedby="roleHelp"></label>
+    </div>
+    <p id="roleHelp" class="hint">Loại tài khoản không thể thay đổi.</p>
+    <fieldset class="password-fields">
+      <legend>Đổi mật khẩu <span>(không bắt buộc)</span></legend>
+      <p class="hint">Để trống các ô dưới nếu bạn không muốn đổi mật khẩu.</p>
+      <label>Mật khẩu hiện tại<div class="password-control"><input id="profileCurrentPassword" name="current_password" type="password" autocomplete="current-password"><button class="password-toggle" type="button" data-password-toggle="profileCurrentPassword" aria-label="Hiện mật khẩu">Hiện</button></div></label>
+      <div class="profile-fields">
+        <label>Mật khẩu mới<div class="password-control"><input id="profileNewPassword" name="new_password" type="password" minlength="8" autocomplete="new-password" aria-describedby="passwordHelp"><button class="password-toggle" type="button" data-password-toggle="profileNewPassword" aria-label="Hiện mật khẩu">Hiện</button></div></label>
+        <label>Nhập lại mật khẩu mới<div class="password-control"><input id="profileConfirmPassword" name="confirm_password" type="password" minlength="8" autocomplete="new-password"><button class="password-toggle" type="button" data-password-toggle="profileConfirmPassword" aria-label="Hiện mật khẩu">Hiện</button></div></label>
+      </div>
+      <p id="passwordHelp" class="hint">Tối thiểu 8 ký tự, gồm chữ và số.</p>
+    </fieldset>
+    <p id="profileMessage" class="profile-message" role="status" aria-live="polite"></p>
+    <div class="actions"><button class="btn ghost" id="profileClose" type="button">Đóng</button><button class="btn" id="profileSave" type="submit">Lưu thay đổi</button></div>
+  </form>
+</dialog>
+<script src="assets/js/app.js"></script><script src="assets/js/owner.js"></script>
+</body></html>

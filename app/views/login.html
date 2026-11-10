@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css"><title>Đăng nhập</title></head><body>
+<header class="top"><div class="wrap"><h1>Bóng đá quanh ta</h1><p>Đặt sân bóng mini, thanh toán bằng mã QR</p></div></header>
+<main class="wrap narrow">
+  <h2 id="title">Đăng nhập</h2>
+  <p id="flash" class="flash" hidden role="alert"></p>
+
+  <form id="loginForm" class="panel stack">
+    <label>Email<input name="email" type="email" required autocomplete="email"></label>
+    <label>Mật khẩu<div class="password-control"><input name="password" id="loginPassword" type="password" required autocomplete="current-password"><button class="password-toggle" type="button" data-password-toggle="loginPassword" aria-label="Hiện mật khẩu">Hiện</button></div></label>
+    <button class="btn">Đăng nhập</button>
+    <p class="hint"><a href="#" id="toRegister">Chưa có tài khoản? Đăng ký</a></p>
+    <p class="hint">Bạn muốn xem sân trước? <a href="dat-san">Tìm sân còn chỗ</a></p>
+  </form>
+
+  <form id="registerForm" class="panel stack" hidden>
+    <label>Bạn là<select name="role" id="role"><option value="customer">Người đặt sân</option><option value="owner">Chủ sân</option></select></label>
+    <label>Họ và tên<input name="name" required maxlength="60" autocomplete="name"></label>
+    <label>Số điện thoại<input name="phone" type="tel" required pattern="(0|\+84)\d{9}" autocomplete="tel"></label>
+    <label id="venueRow" hidden>Tên cụm sân<input name="venue" maxlength="100"></label>
+    <label>Email<input name="email" type="email" required autocomplete="email"></label>
+    <label>Mật khẩu (tối thiểu 8 ký tự, có chữ và số)<div class="password-control"><input name="password" id="registerPassword" type="password" required minlength="8" autocomplete="new-password"><button class="password-toggle" type="button" data-password-toggle="registerPassword" aria-label="Hiện mật khẩu">Hiện</button></div></label>
+    <button class="btn">Đăng ký</button>
+    <p class="hint"><a href="#" id="toLogin">Đã có tài khoản? Đăng nhập</a></p>
+  </form>
+</main>
+<script src="assets/js/app.js"></script><script src="assets/js/login.js"></script>
+</body></html>
