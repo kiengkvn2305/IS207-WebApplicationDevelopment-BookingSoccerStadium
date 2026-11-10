@@ -809,3 +809,28 @@ body::before{content:"⚽";position:fixed;z-index:-1;right:-34px;bottom:9vh;font
   .booking-contact{grid-template-columns:1fr}
   .profile-fields{grid-template-columns:1fr}
 }
+.calendar-days .day{min-width:60px;padding:8px 7px}
+.date-picker-label{display:grid;grid-template-columns:auto minmax(150px,240px);align-items:center;gap:12px;margin:6px 0;font-weight:600}
+.date-picker-label input{margin:0}
+.location-filter{display:flex;align-items:end;flex-wrap:wrap;gap:8px}
+.location-filter label{display:grid;gap:4px;min-width:95px}
+.location-filter small{flex-basis:100%}
+.booking-date-filters{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin:12px 0}
+.booking-date-filters label{display:grid;gap:4px;font-weight:600}
+.booking-date-filters input{margin:0}
+.booking-discount{margin:0;color:var(--turf);font-size:13px;font-weight:600}
+.voucher-entry{margin:14px 0;padding:13px;border:1px solid var(--line);border-radius:8px;background:var(--chalk)}
+.voucher-entry>label{font-weight:600}
+.voucher-entry>div{display:flex;gap:8px;margin-top:5px}
+.voucher-entry input{flex:1;min-width:0;margin:0}
+.voucher-entry .hint{margin:6px 0}
+.voucher-entry .error{color:#a63f2b}
+.inline-choice{display:flex!important;align-items:center;gap:9px}
+.inline-choice input{width:auto;margin:0}
+:root[data-theme=dark] .voucher-entry{background:#333a35;border-color:#424d45}
+:root[data-theme=dark] .booking-discount{color:#a9c5af}
+:root[data-theme=dark] .voucher-entry .error{color:#d39a8b}
+@media(max-width:560px){
+  .date-picker-label{grid-template-columns:1fr;gap:4px}
+  .location-filter{align-items:stretch}
+}

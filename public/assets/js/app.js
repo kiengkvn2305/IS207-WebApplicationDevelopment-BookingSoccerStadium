@@ -42,6 +42,7 @@ const App = (() => {
       $('#profileName').value = user.name || '';
       $('#profileEmail').value = user.email || '';
       $('#profilePhone').value = user.phone || '';
+      form.elements.profile_version.value = user.profile_version || 1;
       $('#profileRole').value = roles[user.role] || 'Người dùng';
       resetPasswordFields();
       $('#profileCurrentPassword').value = '';
@@ -66,6 +67,7 @@ const App = (() => {
           name: $('#profileName').value,
           email: $('#profileEmail').value,
           phone: $('#profilePhone').value,
+          profile_version: Number(form.elements.profile_version.value),
           current_password: $('#profileCurrentPassword').value,
           new_password: $('#profileNewPassword').value,
           confirm_password: $('#profileConfirmPassword').value
@@ -105,6 +107,10 @@ const App = (() => {
     const list = center.querySelector('.notification-list');
     const readAll = center.querySelector('.notification-read-all');
     let loading = false;
+    let socket = null;
+    let reconnectDelay = 1000;
+    let reconnectTimer = null;
+    let lastId = 0;
 
     function render(data) {
       const count = Number(data.unread_count || 0);
@@ -113,6 +119,7 @@ const App = (() => {
       badge.textContent = count > 99 ? '99+' : String(count);
       badge.setAttribute('aria-label', `${count} thông báo chưa đọc`);
       readAll.disabled = count === 0;
+      lastId = Math.max(lastId, ...data.items.map(item => Number(item.id) || 0), 0);
       list.innerHTML = data.items.length ? data.items.map(item => {
         const time = new Date(String(item.created_at).replace(' ', 'T') + '+07:00');
         const dateText = Number.isNaN(time.getTime()) ? esc(item.created_at) : esc(time.toLocaleString('vi-VN'));
@@ -131,12 +138,55 @@ const App = (() => {
       if (loading) return;
       loading = true;
       try {
-        render(await api('notifications'));
+        const data = await api('notifications');
+        render(data);
+        return data;
       } catch (error) {
         list.innerHTML = `<p class="error notification-error">${esc(error.message || 'Không thể tải thông báo.')}</p>`;
       } finally {
         loading = false;
       }
+    }
+    async function connectWebSocket() {
+      try {
+        const initial = await refresh();
+        if (!initial) {
+          scheduleReconnect();
+          return;
+        }
+        const connection = await api(`notifications/ws-ticket?since_id=${lastId}`);
+        const candidate = new WebSocket(connection.url);
+        socket = candidate;
+        candidate.addEventListener('open', () => {
+          reconnectDelay = 1000;
+          candidate.send(JSON.stringify({ type: 'auth', ticket: connection.ticket }));
+        }, { once: true });
+        candidate.addEventListener('message', event => {
+          let message;
+          try { message = JSON.parse(event.data); }
+          catch (error) {
+            console.error('Invalid notification WebSocket message.', error);
+            return;
+          }
+          if (message.type === 'notification') refresh();
+        });
+        candidate.addEventListener('close', () => {
+          if (socket === candidate) socket = null;
+          scheduleReconnect();
+        }, { once: true });
+        candidate.addEventListener('error', () => candidate.close(), { once: true });
+      } catch (error) {
+        console.warn('Real-time notifications are unavailable; polling remains enabled.', error);
+        scheduleReconnect();
+      }
+    }
+    function scheduleReconnect() {
+      if (reconnectTimer || document.hidden) return;
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        connectWebSocket();
+      }, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 2, 30000);
     }
     toggle.addEventListener('click', async () => {
       const opening = panel.hidden;
@@ -177,8 +227,11 @@ const App = (() => {
         toggle.setAttribute('aria-expanded', 'false');
       }
     });
-    refresh();
+    connectWebSocket();
     window.setInterval(() => { if (!document.hidden) refresh(); }, 30000);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && !socket) scheduleReconnect();
+    });
   }
   async function init() {
     let theme = localStorage.getItem('sannha-theme') === 'dark' ? 'dark' : 'light';

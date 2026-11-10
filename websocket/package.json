@@ -1,0 +1,13 @@
+{
+  "name": "sannha-notification-websocket",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Authenticated real-time notification transport for the Sân Nhà PHP app",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "mysql2": "^3.14.4",
+    "ws": "^8.18.3"
+  }
+}

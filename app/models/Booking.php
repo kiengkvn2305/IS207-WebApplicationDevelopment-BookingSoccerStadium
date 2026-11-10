@@ -1,12 +1,13 @@
 <?php
 class Booking {
-    const SEL = "SELECT b.*, p.name pitch, p.type pitch_type, o.venue_name venue,
+    const SEL = "SELECT b.*, v.code voucher_code, p.name pitch, p.type pitch_type, o.venue_name venue,
         o.address venue_address, owner.name owner_name, owner.phone owner_phone,
         TIMESTAMPDIFF(SECOND,NOW(),b.expires_at) left_s,
         TIMESTAMPDIFF(MINUTE,NOW(),TIMESTAMP(b.date,MAKETIME(b.start_hour,0,0))) mins_to_start,
         TIMESTAMPDIFF(SECOND,NOW(),TIMESTAMP(b.date,MAKETIME(b.start_hour,0,0))) seconds_to_start
         FROM bookings b JOIN pitches p ON p.id=b.pitch_id
-        JOIN users owner ON owner.id=p.owner_id LEFT JOIN owner_profiles o ON o.user_id=owner.id ";
+        JOIN users owner ON owner.id=p.owner_id LEFT JOIN owner_profiles o ON o.user_id=owner.id
+        LEFT JOIN vouchers v ON v.id=b.voucher_id ";
 
     // Nhả sân với các đơn chờ thanh toán đã quá hạn
     static function expireHolds(): void {
@@ -45,27 +46,47 @@ class Booking {
     static function pendingCount(int $uid): int {
         return (int)Database::q("SELECT COUNT(*) FROM bookings WHERE user_id=? AND status='pending'", [$uid])->fetchColumn();
     }
-    // Trả về id đơn, hoặc 0 nếu có giờ vừa bị người khác đặt
-    static function create(int $uid, array $pitch, string $date, array $hours): int {
+    // Returns the booking id, applied discount, or an error when the voucher is no longer usable.
+    static function create(int $uid, array $pitch, string $date, array $hours, string $voucherCode = ''): array {
         $pdo = Database::pdo(); $code = strtoupper(bin2hex(random_bytes(4)));
         $total = array_sum(array_map(fn($h) => Pitch::price($pitch, $h), $hours));
         $pdo->beginTransaction();
         try {
             Database::q("SELECT id FROM pitches WHERE id=? FOR UPDATE", [$pitch['id']])->fetch();
+            $voucher = null;
+            $discount = 0;
+            if ($voucherCode !== '') {
+                $voucher = Voucher::quote($voucherCode, $total, true);
+                if (isset($voucher['error'])) {
+                    $pdo->rollBack();
+                    return ['id' => 0, 'error' => $voucher['error']];
+                }
+                $discount = $voucher['discount'];
+            }
             foreach ($hours as $h) {
                 if (Database::q("SELECT 1 FROM unavailable_slots WHERE pitch_id=? AND date=? AND hour=?", [$pitch['id'], $date, $h])->fetchColumn()) {
-                    $pdo->rollBack(); return 0;
+                    $pdo->rollBack(); return ['id' => 0, 'error' => null];
                 }
             }
-            Database::q("INSERT INTO bookings(code,user_id,pitch_id,date,start_hour,end_hour,total,status,expires_at)
-                VALUES(?,?,?,?,?,?,?,'confirmed',TIMESTAMP(?,MAKETIME(?,0,0)))",
-                [$code, $uid, $pitch['id'], $date, $hours[0], end($hours) + 1, $total, $date, end($hours) + 1]);
+            Database::q("INSERT INTO bookings(code,user_id,pitch_id,date,start_hour,end_hour,total,subtotal,discount,voucher_id,status,expires_at)
+                VALUES(?,?,?,?,?,?,?,?,?,?,'confirmed',TIMESTAMP(?,MAKETIME(?,0,0)))",
+                [$code, $uid, $pitch['id'], $date, $hours[0], end($hours) + 1, $total - $discount, $total,
+                    $discount, $voucher['id'] ?? null, $date, end($hours) + 1]);
             $id = (int)$pdo->lastInsertId();
             foreach ($hours as $h) Database::q("INSERT INTO booking_slots(booking_id,pitch_id,date,hour) VALUES(?,?,?,?)", [$id, $pitch['id'], $date, $h]);
-            $pdo->commit(); return $id;
+            if ($voucher) {
+                Database::q("UPDATE vouchers SET usage_count=usage_count+1 WHERE id=?", [$voucher['id']]);
+                Database::q("INSERT INTO voucher_redemptions(voucher_id,booking_id,user_id,discount) VALUES(?,?,?,?)",
+                    [$voucher['id'], $id, $uid, $discount]);
+            }
+            $pdo->commit();
+            return ['id' => $id, 'error' => null, 'subtotal' => $total, 'discount' => $discount, 'total' => $total - $discount];
         } catch (PDOException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
-            if ((int)($e->errorInfo[1] ?? 0) === 1062) return 0;
+            if ((int)($e->errorInfo[1] ?? 0) === 1062) return ['id' => 0, 'error' => null];
+            throw $e;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
         }
     }
@@ -152,11 +173,12 @@ class Booking {
 
     // ---- Chủ sân ----
     static function listByOwner(int $owner): array {
-        return Database::q("SELECT b.id,b.code,b.date,b.start_hour,b.end_hour,b.total,b.status,b.refund_status,b.refund_amount,
+        return Database::q("SELECT b.id,b.code,b.date,b.start_hour,b.end_hour,b.total,b.subtotal,b.discount,v.code voucher_code,b.status,b.refund_status,b.refund_amount,
             b.cancellation_fee,b.cancelled_by,
             TIMESTAMPDIFF(SECOND,NOW(),TIMESTAMP(b.date,MAKETIME(b.start_hour,0,0))) owner_seconds_to_start,
             (b.expires_at>NOW()) live,
             p.name pitch, c.name cname, c.phone cphone FROM bookings b JOIN pitches p ON p.id=b.pitch_id JOIN users c ON c.id=b.user_id
+            LEFT JOIN vouchers v ON v.id=b.voucher_id
             WHERE p.owner_id=? ORDER BY b.id DESC LIMIT 50", [$owner])->fetchAll();
     }
     static function cancelByOwner(int $id, int $owner): ?array {
@@ -326,7 +348,8 @@ class Booking {
 
     // ---- Admin ----
     static function recentAll(): array {
-        return Database::q("SELECT b.code,b.date,b.start_hour,b.total,b.status,p.name pitch,c.name cname,w.name wname FROM bookings b
+        return Database::q("SELECT b.code,b.date,b.start_hour,b.total,b.subtotal,b.discount,v.code voucher_code,b.status,p.name pitch,c.name cname,w.name wname FROM bookings b
+            LEFT JOIN vouchers v ON v.id=b.voucher_id
             JOIN pitches p ON p.id=b.pitch_id JOIN users c ON c.id=b.user_id JOIN users w ON w.id=p.owner_id ORDER BY b.id DESC LIMIT 30")->fetchAll();
     }
 }

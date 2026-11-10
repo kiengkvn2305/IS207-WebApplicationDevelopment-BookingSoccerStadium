@@ -96,8 +96,18 @@ class MatchChallenge {
                 WHERE id=? AND user_id=? AND status IN ('confirmed','paid')
                 AND TIMESTAMP(date,MAKETIME(start_hour,0,0))>NOW() FOR UPDATE", [$bookingId, $userId])->fetchColumn();
             if (!$booking) { $pdo->rollBack(); return false; }
-            Database::q("INSERT INTO match_challenges(booking_id,creator_id,team_name,contact_phone,description,players_needed)
-                VALUES(?,?,?,?,?,?)", [$bookingId, $userId, $teamName, $phone, $description, $playersNeeded]);
+            $existing = Database::q("SELECT id,status FROM match_challenges WHERE booking_id=? FOR UPDATE", [$bookingId])->fetch();
+            if ($existing) {
+                if ($existing['status'] !== 'cancelled') { $pdo->rollBack(); return false; }
+                Database::q("UPDATE match_requests SET status='declined'
+                    WHERE challenge_id=? AND status IN ('pending','accepted')", [$existing['id']]);
+                Database::q("UPDATE match_challenges SET creator_id=?,team_name=?,contact_phone=?,description=?,
+                    players_needed=?,join_open=?,status='open' WHERE id=?",
+                    [$userId, $teamName, $phone, $description, $playersNeeded, $playersNeeded > 0 ? 1 : 0, $existing['id']]);
+            } else {
+                Database::q("INSERT INTO match_challenges(booking_id,creator_id,team_name,contact_phone,description,players_needed,join_open)
+                    VALUES(?,?,?,?,?,?,?)", [$bookingId, $userId, $teamName, $phone, $description, $playersNeeded, $playersNeeded > 0 ? 1 : 0]);
+            }
             $pdo->commit();
             return true;
         } catch (PDOException $e) {
@@ -234,7 +244,7 @@ class MatchChallenge {
                 return false;
             }
             if ($action === 'capacity') {
-                if ($playersNeeded === null || $playersNeeded < 1 || $playersNeeded > 30
+                if ($playersNeeded === null || $playersNeeded < 0 || $playersNeeded > 30
                     || $playersNeeded < (int)$challenge['accepted_players']) {
                     $pdo->rollBack();
                     return false;

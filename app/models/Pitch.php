@@ -4,7 +4,7 @@ class Pitch {
     private const BOOKABLE = "FROM pitches p JOIN users w ON w.id=p.owner_id AND w.status='active'
         JOIN owner_profiles o ON o.user_id=p.owner_id AND o.account_no IS NOT NULL AND o.account_no<>'' WHERE p.active=1";
     static function listBookable(): array {
-        return Database::q("SELECT p.*, o.venue_name, o.address, w.name owner_name, w.phone owner_phone "
+        return Database::q("SELECT p.*, o.venue_name, o.address, o.latitude, o.longitude, w.name owner_name, w.phone owner_phone "
             . self::BOOKABLE . " ORDER BY p.owner_id, p.id")->fetchAll();
     }
     static function bookable(int $id): ?array {
@@ -14,8 +14,8 @@ class Pitch {
     static function byOwner(int $uid): array { return Database::q("SELECT * FROM pitches WHERE owner_id=? ORDER BY id", [$uid])->fetchAll(); }
     static function unavailableMap(string $date): array {
         $m = [];
-        foreach (Database::q("SELECT pitch_id,hour FROM unavailable_slots WHERE date=?", [$date]) as $r) {
-            $m[(int)$r['pitch_id']][(int)$r['hour']] = true;
+        foreach (Database::q("SELECT pitch_id,hour,reason FROM unavailable_slots WHERE date=?", [$date]) as $r) {
+            $m[(int)$r['pitch_id']][(int)$r['hour']] = (string)($r['reason'] ?? '');
         }
         return $m;
     }
@@ -29,7 +29,7 @@ class Pitch {
     static function toggle(int $id, int $uid): bool {
         return Database::q("UPDATE pitches SET active=1-active WHERE id=? AND owner_id=?", [$id, $uid])->rowCount() > 0;
     }
-    static function setUnavailable(int $id, int $uid, string $date, int $hour): bool {
+    static function setUnavailable(int $id, int $uid, string $date, int $hour, string $reason): bool {
         $pdo = Database::pdo();
         $pdo->beginTransaction();
         $pitch = Database::q("SELECT id FROM pitches WHERE id=? AND owner_id=? FOR UPDATE", [$id, $uid])->fetch();
@@ -37,7 +37,7 @@ class Pitch {
         if (Database::q("SELECT 1 FROM booking_slots WHERE pitch_id=? AND date=? AND hour=?", [$id, $date, $hour])->fetchColumn()) {
             $pdo->rollBack(); return false;
         }
-        Database::q("INSERT IGNORE INTO unavailable_slots(pitch_id,date,hour) VALUES(?,?,?)", [$id, $date, $hour]);
+        Database::q("INSERT IGNORE INTO unavailable_slots(pitch_id,date,hour,reason) VALUES(?,?,?,?)", [$id, $date, $hour, $reason]);
         $pdo->commit();
         return true;
     }

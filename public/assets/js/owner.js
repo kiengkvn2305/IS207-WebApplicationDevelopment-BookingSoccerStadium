@@ -15,8 +15,11 @@
     }
   });
   let filled = false;
-  let amenityChoicesFilled = false;
+  let profileDirty = false;
+  let profileSaving = false;
+  let amenitiesFilled = false;
   const notifiedMatchAlerts = new Set();
+  let pendingSlot = null;
   const ymd = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
   async function load() {
@@ -51,18 +54,24 @@
       ? 'Đã cấu hình nhận thông báo SePay. Phí hủy sẽ được xác nhận tự động khi khách chuyển khoản đúng số tiền và nội dung.'
       : 'Chưa cấu hình HMAC secret SePay. Khách vẫn đặt sân bình thường; khi phát sinh phí hủy, hãy đối chiếu giao dịch ngân hàng và xử lý thủ công.';
     if (!filled) {
-      filled = true;
       $('#bankSel').innerHTML += Object.entries(d.banks).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join('');
-      const f = $('#bankForm');
-      ['venue_name', 'address', 'bank_bin', 'account_no', 'account_name'].forEach(n => { f.elements[n].value = p[n] || ''; });
+      filled = true;
+    }
+    const f = $('#bankForm');
+    const profileVersion = Number(p.profile_version) || 1;
+    const formVersion = Number(f.elements.profile_version.value) || 0;
+    if (!profileDirty && !profileSaving && profileVersion >= formVersion) {
+      ['venue_name', 'address', 'latitude', 'longitude', 'bank_bin', 'account_no', 'account_name'].forEach(n => { f.elements[n].value = p[n] ?? ''; });
+      f.elements.profile_version.value = profileVersion;
+      $('#ownerLocationStatus').textContent = p.latitude !== null && p.longitude !== null
+        ? 'Đã lưu tọa độ cụm sân.' : 'Cần tọa độ để khách lọc theo khoảng cách.';
     }
     $('#venueGallery').innerHTML = d.venue_images.map(image => `<figure><img src="${esc(image.url)}" alt="Ảnh cụm sân" loading="lazy">
       <button class="btn ghost sm" type="button" data-act="venue-image-delete" data-id="${+image.id}">Xóa ảnh</button></figure>`).join('')
       || '<p class="empty">Chưa có ảnh cụm sân.</p>';
-    if (!amenityChoicesFilled) {
-      $('#amenityChoices').innerHTML = Object.entries(d.amenity_options).map(([key, label]) =>
-        `<label class="amenity-option"><input type="checkbox" name="amenities" value="${esc(key)}" ${d.amenities.includes(key) ? 'checked' : ''}>${esc(label)}</label>`).join('');
-      amenityChoicesFilled = true;
+    if (!amenitiesFilled) {
+      $('#amenityText').value = d.amenities.join('\n');
+      amenitiesFilled = true;
     }
     $('#noBank').hidden = !!p.account_no;
     $('#pitchRows').innerHTML = d.pitches.map(x => `<tr><td>${x.image_url ? `<img class="pitch-thumb" src="${esc(x.image_url)}" alt="Ảnh ${esc(x.name)}">` : '<span class="hint">Chưa có ảnh</span>'}
@@ -87,7 +96,8 @@
       const rf = b.refund_status === 'pending' ? `<br><small>Cần hoàn ${money(b.refund_amount)}</small>` : b.refund_status === 'done' ? `<br><small>Đã hoàn ${money(b.refund_amount)}</small>` : '';
       return `<tr><td>${esc(b.code)}</td><td>${esc(b.cname)}<br><small>${esc(b.cphone)}</small></td><td>${esc(b.pitch)}</td>
         <td>${dmy(b.date)}<br><small>${pad(b.start_hour)}–${pad(b.end_hour)}</small></td>
-        <td>${money(b.total)}${b.status === 'cancel_fee_pending' ? `<br><small>Phí hủy: ${money(b.cancellation_fee)}</small>` : ''}</td>
+        <td>${money(b.total)}${+b.discount > 0 ? `<br><small>${esc(b.voucher_code)} · giảm ${money(b.discount)}</small>` : ''}
+          ${b.status === 'cancel_fee_pending' ? `<br><small>Phí hủy: ${money(b.cancellation_fee)}</small>` : ''}</td>
         <td><span class="tag ${esc(b.status)}">${esc(b.status_text)}</span>${rf}</td><td>${act.join(' ')}</td></tr>`;
     }).join('') || '<tr><td colspan="7" class="empty">Chưa có đơn nào.</td></tr>';
   }
@@ -99,8 +109,8 @@
       const { slots } = await api(`owner/pitch-slots?pitch_id=${encodeURIComponent(pitchId)}&date=${encodeURIComponent(date)}`);
       box.innerHTML = slots.map(s => {
         const label = `${pad(s.hour)}–${pad(s.hour + 1)}`;
-        if (s.status === 'free') return `<button type="button" class="schedule-slot free" data-slot-action="close" data-hour="${s.hour}">${label}<small>Gỡ khung giờ</small></button>`;
-        if (s.status === 'unavailable') return `<button type="button" class="schedule-slot unavailable" data-slot-action="open" data-hour="${s.hour}">${label}<small>Mở lại</small></button>`;
+        if (s.status === 'free') return `<button type="button" class="schedule-slot free" data-slot-action="close" data-hour="${s.hour}">${label}<small>Khóa khung giờ</small></button>`;
+        if (s.status === 'unavailable') return `<button type="button" class="schedule-slot unavailable" data-slot-action="open" data-hour="${s.hour}" title="${esc(s.reason || '')}">${label}<small>${esc(s.reason || 'Đã khóa')} · Mở lại</small></button>`;
         return `<button type="button" class="schedule-slot ${s.status}" disabled>${label}<small>${s.status === 'booked' ? 'Đã đặt' : 'Đã qua'}</small></button>`;
       }).join('');
     } catch (e) { box.innerHTML = `<p class="error">${esc(e.message)}</p>`; }
@@ -111,14 +121,32 @@
     catch (e) { flash(e.message, 'err'); }
   };
   const data = f => Object.fromEntries(new FormData(f));
-  $('#bankForm').onsubmit = e => { e.preventDefault(); send('owner/bank', data(e.target), 'Đã lưu thông tin nhận tiền. Khách sẽ chuyển khoản vào tài khoản này.'); };
+  const profileFields = ['venue_name', 'address', 'latitude', 'longitude', 'bank_bin', 'account_no', 'account_name'];
+  $('#bankForm').addEventListener('input', () => { profileDirty = true; });
+  $('#bankForm').addEventListener('change', () => { profileDirty = true; });
+  $('#bankForm').onsubmit = async e => {
+    e.preventDefault();
+    if (profileSaving) return;
+    const submitted = data(e.target);
+    profileSaving = true;
+    try {
+      const result = await api('owner/bank', { method: 'POST', body: submitted });
+      e.target.elements.profile_version.value = result.profile_version;
+      profileDirty = profileFields.some(name => e.target.elements[name].value !== submitted[name]);
+      $('#ownerLocationStatus').textContent = $('#venueLatitude').value && $('#venueLongitude').value
+        ? 'Đã lưu tọa độ cụm sân.' : 'Chưa lưu tọa độ; khách chưa thể lọc cụm sân theo khoảng cách.';
+      flash('Đã lưu thông tin nhận tiền và vị trí cụm sân.');
+      await load();
+    } catch (error) { flash(error.message, 'err'); }
+    finally { profileSaving = false; }
+  };
   $('#amenityForm').onsubmit = async e => {
     e.preventDefault();
-    const amenities = [...e.target.querySelectorAll('input[name="amenities"]:checked')].map(input => input.value);
+    const amenities = $('#amenityText').value.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
     try {
       await api('owner/venue-details', { method: 'POST', body: { amenities } });
       flash('Đã lưu tiện ích cụm sân.');
-      amenityChoicesFilled = false;
+      amenitiesFilled = false;
       await load();
     } catch (error) { flash(error.message, 'err'); }
   };
@@ -132,14 +160,49 @@
     const button = e.target.closest('button[data-slot-action]'); if (!button) return;
     button.disabled = true;
     const closing = button.dataset.slotAction === 'close';
+    const slot = { pitch_id: Number($('#schedulePitch').value), date: $('#scheduleDate').value, hour: Number(button.dataset.hour) };
+    if (closing) {
+      pendingSlot = slot;
+      $('#blockSlotInfo').textContent = `${$('#schedulePitch').selectedOptions[0]?.textContent || 'Sân'} · ${dmy(slot.date)} · ${pad(slot.hour)}–${pad(slot.hour + 1)}`;
+      $('#blockSlotReason').value = '';
+      $('#blockSlotError').textContent = '';
+      $('#blockSlotDlg').showModal();
+      button.disabled = false;
+      return;
+    }
     try {
-      await api(`owner/${closing ? 'unavailable-slot' : 'available-slot'}`, {
-        method: 'POST', body: { pitch_id: Number($('#schedulePitch').value), date: $('#scheduleDate').value, hour: Number(button.dataset.hour) }
-      });
-      flash(closing ? 'Đã gỡ khung giờ khỏi lịch đặt.' : 'Đã mở lại khung giờ.');
+      await api('owner/available-slot', { method: 'POST', body: slot });
+      flash('Đã mở lại khung giờ.');
       await loadSchedule();
     } catch (e) { flash(e.message, 'err'); button.disabled = false; }
   });
+  $('#blockSlotCancel').onclick = () => { pendingSlot = null; $('#blockSlotDlg').close(); };
+  $('#blockSlotConfirm').onclick = async () => {
+    const reason = $('#blockSlotReason').value.trim();
+    if (!reason) { $('#blockSlotError').textContent = 'Vui lòng nhập lý do khóa sân.'; $('#blockSlotReason').focus(); return; }
+    const button = $('#blockSlotConfirm');
+    button.disabled = true;
+    try {
+      await api('owner/unavailable-slot', { method: 'POST', body: { ...pendingSlot, reason } });
+      $('#blockSlotDlg').close();
+      pendingSlot = null;
+      flash('Đã khóa khung giờ kèm lý do.');
+      await loadSchedule();
+    } catch (error) { $('#blockSlotError').textContent = error.message; }
+    finally { button.disabled = false; }
+  };
+  $('#ownerUseLocation').onclick = () => {
+    if (!navigator.geolocation) { $('#ownerLocationStatus').textContent = 'Trình duyệt không hỗ trợ lấy vị trí.'; return; }
+    $('#ownerLocationStatus').textContent = 'Đang lấy tọa độ...';
+    navigator.geolocation.getCurrentPosition(position => {
+      $('#venueLatitude').value = position.coords.latitude.toFixed(7);
+      $('#venueLongitude').value = position.coords.longitude.toFixed(7);
+      $('#ownerLocationStatus').textContent = 'Đã lấy tọa độ. Lưu thông tin để khách lọc theo khoảng cách.';
+    }, error => {
+      $('#ownerLocationStatus').textContent = error.code === error.PERMISSION_DENIED
+        ? 'Bạn chưa cấp quyền vị trí.' : 'Không lấy được vị trí. Hãy nhập tọa độ thủ công.';
+    }, { enableHighAccuracy: true, timeout: 10000 });
+  };
   $('#pitchRows').addEventListener('change', async e => {
     const input = e.target.closest('input[type="file"][data-image-id]');
     if (!input || !input.files.length) return;

@@ -6,16 +6,16 @@ class OwnerController extends Controller {
         $pitches = array_map(fn($p) => $p + ['image_url' => $p['image_path'] ? BASE . '/' . $p['image_path'] : null], Pitch::byOwner($id));
         $images = array_map(fn($image) => ['id' => (int)$image['id'], 'url' => BASE . '/' . $image['image_path']], Venue::images($id));
         Http::json(['banks' => BANKS, 'profile' => OwnerProfile::get($id), 'pitches' => $pitches, 'bookings' => $bookings,
-            'venue_images' => $images, 'amenities' => Venue::amenities($id), 'amenity_options' => Venue::AMENITIES,
+            'venue_images' => $images, 'amenities' => Venue::amenities($id),
             'sepay_secret_configured' => SEPAY_WEBHOOK_SECRET !== '',
             'match_alerts' => MatchChallenge::ownerAlerts($id)]);
     }
     function saveVenueDetails(): void {
         $u = $this->guard(['owner']); $body = $this->body();
         $amenities = $body['amenities'] ?? [];
-        if (!is_array($amenities) || count($amenities) > count(Venue::AMENITIES)) Http::error('Danh sách tiện ích không hợp lệ.', 422);
+        if (!is_array($amenities) || count($amenities) > 20) Http::error('Tối đa 20 tiện ích.', 422);
         foreach ($amenities as $amenity) {
-            if (!is_string($amenity) || !isset(Venue::AMENITIES[$amenity])) Http::error('Danh sách tiện ích không hợp lệ.', 422);
+            if (!is_string($amenity) || mb_strlen(trim($amenity)) > 80) Http::error('Mỗi tiện ích không được vượt quá 80 ký tự.', 422);
         }
         Venue::saveAmenities((int)$u['id'], $amenities);
         Audit::log('owner_amenities_update');
@@ -56,13 +56,28 @@ class OwnerController extends Controller {
         $u = $this->guard(['owner']); $b = $this->body();
         $bin = (string)($b['bank_bin'] ?? ''); $no = preg_replace('/\s+/', '', (string)($b['account_no'] ?? ''));
         $nm = strtoupper(trim((string)($b['account_name'] ?? ''))); $venue = trim((string)($b['venue_name'] ?? ''));
+        $latitudeRaw = trim((string)($b['latitude'] ?? ''));
+        $longitudeRaw = trim((string)($b['longitude'] ?? ''));
+        $latitude = $latitudeRaw === '' ? null : filter_var($latitudeRaw, FILTER_VALIDATE_FLOAT);
+        $longitude = $longitudeRaw === '' ? null : filter_var($longitudeRaw, FILTER_VALIDATE_FLOAT);
         if (!isset(BANKS[$bin])) Http::error('Chọn ngân hàng hợp lệ.', 422);
         if (!preg_match('/^\d{6,19}$/', $no)) Http::error('Số tài khoản gồm 6–19 chữ số.', 422);
         if (!preg_match('/^[A-Z ]{3,60}$/', $nm)) Http::error('Tên chủ tài khoản viết HOA, không dấu.', 422);
         if (mb_strlen($venue) < 2) Http::error('Nhập tên cụm sân.', 422);
-        OwnerProfile::update((int)$u['id'], $venue, trim((string)($b['address'] ?? '')), $bin, $no, $nm);
+        if (($latitudeRaw === '') !== ($longitudeRaw === '') || $latitude === false || $longitude === false
+            || ($latitude !== null && ($latitude < -90 || $latitude > 90))
+            || ($longitude !== null && ($longitude < -180 || $longitude > 180))) {
+            Http::error('Vị trí phải có đủ vĩ độ (-90 đến 90) và kinh độ (-180 đến 180).', 422);
+        }
+        $address = trim((string)($b['address'] ?? ''));
+        if (mb_strlen($address) > 200) Http::error('Địa chỉ không được vượt quá 200 ký tự.', 422);
+        $version = filter_var($b['profile_version'] ?? null, FILTER_VALIDATE_INT);
+        if ($version === false || $version < 1) Http::error('Thông tin cụm sân đã cũ. Hãy tải lại trang rồi thử lại.', 409);
+        if (!OwnerProfile::update((int)$u['id'], $venue, $address, $latitude, $longitude, $bin, $no, $nm, $version)) {
+            Http::error('Thông tin cụm sân đã được cập nhật ở nơi khác. Tải lại trang để xem thay đổi rồi thử lại.', 409);
+        }
         Audit::log('owner_bank_update', BANKS[$bin] . ' ****' . substr($no, -4));
-        Http::json(['ok' => true]);
+        Http::json(['ok' => true, 'profile_version' => $version + 1]);
     }
     function addPitch(): void {
         $u = $this->guard(['owner']); $b = $this->body();
@@ -75,14 +90,18 @@ class OwnerController extends Controller {
     function unavailableSlot(): void {
         $u = $this->guard(['owner']); $b = $this->body();
         $date = (string)($b['date'] ?? ''); $hour = (int)($b['hour'] ?? -1);
+        $reason = trim((string)($b['reason'] ?? ''));
         $d = DateTime::createFromFormat('Y-m-d', $date);
         if (!$d || $d->format('Y-m-d') !== $date || $date < date('Y-m-d') || $date > date('Y-m-d', strtotime('+13 days'))
             || $hour < OPEN_HOUR || $hour >= CLOSE_HOUR || ($date === date('Y-m-d') && $hour <= (int)date('G'))) {
             Http::error('Ngày hoặc khung giờ không hợp lệ.', 422);
         }
-        if (!Pitch::setUnavailable((int)($b['pitch_id'] ?? 0), (int)$u['id'], $date, $hour)) {
+        if ($reason === '' || mb_strlen($reason) > 255) Http::error('Nhập lý do khóa sân (tối đa 255 ký tự).', 422);
+        $pitchId = (int)($b['pitch_id'] ?? 0);
+        if (!Pitch::setUnavailable($pitchId, (int)$u['id'], $date, $hour, $reason)) {
             Http::error('Không tìm thấy sân hoặc khung giờ đã có người đặt.', 409);
         }
+        Audit::log('owner_slot_block', "pitch #$pitchId $date $hour:00 · $reason");
         Http::json(['ok' => true]);
     }
     function availableSlot(): void {
@@ -93,9 +112,11 @@ class OwnerController extends Controller {
             || $hour < OPEN_HOUR || $hour >= CLOSE_HOUR || ($date === date('Y-m-d') && $hour <= (int)date('G'))) {
             Http::error('Ngày hoặc khung giờ không hợp lệ.', 422);
         }
-        if (!Pitch::setAvailable((int)($b['pitch_id'] ?? 0), (int)$u['id'], $date, $hour)) {
+        $pitchId = (int)($b['pitch_id'] ?? 0);
+        if (!Pitch::setAvailable($pitchId, (int)$u['id'], $date, $hour)) {
             Http::error('Khung giờ không tìm thấy hoặc đã được gỡ trước đó.', 404);
         }
+        Audit::log('owner_slot_open', "pitch #$pitchId $date $hour:00");
         Http::json(['ok' => true]);
     }
     function pitchSlots(): void {
@@ -112,8 +133,8 @@ class OwnerController extends Controller {
         $unavailable = Pitch::unavailableMap($date)[$id] ?? [];
         $slots = []; $now = (int)date('G'); $today = $date === date('Y-m-d');
         for ($hour = OPEN_HOUR; $hour < CLOSE_HOUR; $hour++) {
-            $status = !empty($booked[$hour]) ? 'booked' : (!empty($unavailable[$hour]) ? 'unavailable' : (($today && $hour <= $now) ? 'past' : 'free'));
-            $slots[] = ['hour' => $hour, 'status' => $status];
+            $status = !empty($booked[$hour]) ? 'booked' : (array_key_exists($hour, $unavailable) ? 'unavailable' : (($today && $hour <= $now) ? 'past' : 'free'));
+            $slots[] = ['hour' => $hour, 'status' => $status, 'reason' => (string)($unavailable[$hour] ?? '')];
         }
         Http::json(['slots' => $slots]);
     }

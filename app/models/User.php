@@ -1,7 +1,7 @@
 <?php
 class User {
     static function find(int $id): ?array {
-        return Database::q("SELECT id,name,email,phone,role,status,created_at FROM users WHERE id=?", [$id])->fetch() ?: null;
+        return Database::q("SELECT id,name,email,phone,role,status,profile_version,created_at FROM users WHERE id=?", [$id])->fetch() ?: null;
     }
     static function byEmail(string $email): ?array {
         return Database::q("SELECT * FROM users WHERE email=?", [$email])->fetch() ?: null;
@@ -12,13 +12,14 @@ class User {
     static function emailTaken(string $email, int $exceptId): bool {
         return (bool)Database::q("SELECT 1 FROM users WHERE email=? AND id<>? LIMIT 1", [$email, $exceptId])->fetchColumn();
     }
-    static function updateProfile(int $id, string $name, string $email, string $phone, ?string $password = null): void {
+    static function updateProfile(int $id, string $name, string $email, string $phone, int $version, ?string $password = null): bool {
         if ($password === null) {
-            Database::q("UPDATE users SET name=?,email=?,phone=? WHERE id=?", [$name, $email, $phone, $id]);
-            return;
+            return Database::q("UPDATE users SET name=?,email=?,phone=?,profile_version=profile_version+1
+                WHERE id=? AND profile_version=?", [$name, $email, $phone, $id, $version])->rowCount() > 0;
         }
-        Database::q("UPDATE users SET name=?,email=?,phone=?,password_hash=? WHERE id=?",
-            [$name, $email, $phone, password_hash($password, PASSWORD_DEFAULT), $id]);
+        return Database::q("UPDATE users SET name=?,email=?,phone=?,password_hash=?,profile_version=profile_version+1
+            WHERE id=? AND profile_version=?",
+            [$name, $email, $phone, password_hash($password, PASSWORD_DEFAULT), $id, $version])->rowCount() > 0;
     }
     static function create(string $name, string $email, string $phone, string $pw, string $role, string $venue): bool {
         $pdo = Database::pdo();

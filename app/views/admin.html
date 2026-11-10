@@ -23,6 +23,23 @@
           <h2>Tổng quan</h2>
           <div class="stats" id="stats"></div>
         </section>
+        <section><h2>Mã giảm giá</h2>
+          <p class="hint">Mỗi đơn chỉ dùng một mã. Hệ thống khóa lượt dùng trong giao dịch đặt sân và kiểm tra lại hạn dùng, giá trị tối thiểu, số lượt trước khi áp dụng.</p>
+          <form id="voucherForm" class="panel grid2">
+            <label>Mã voucher<input name="code" required maxlength="32" pattern="[A-Za-z0-9_-]+" autocomplete="off"></label>
+            <label>Loại giảm giá<select name="discount_type" id="voucherType"><option value="percent">Phần trăm</option><option value="fixed">Số tiền</option></select></label>
+            <label>Giá trị giảm<input name="discount_value" id="voucherValue" type="number" min="1" max="100" required></label>
+            <label>Đơn tối thiểu (đ)<input name="min_total" type="number" min="0" max="100000000" step="10000" value="0" required></label>
+            <label>Bắt đầu<input name="starts_at" id="voucherStarts" type="datetime-local" required></label>
+            <label>Kết thúc<input name="ends_at" id="voucherEnds" type="datetime-local" required></label>
+            <label>Số lượt tối đa (để trống = không giới hạn)<input name="usage_limit" type="number" min="1" max="1000000"></label>
+            <div class="end"><button class="btn">Tạo voucher</button></div>
+          </form>
+          <div class="tablewrap"><table>
+            <thead><tr><th>Mã</th><th>Mức giảm</th><th>Đơn tối thiểu</th><th>Thời hạn</th><th>Lượt dùng</th><th>Trạng thái</th><th></th></tr></thead>
+            <tbody id="voucherRows"></tbody>
+          </table></div>
+        </section>
       <section><h2>Tài khoản</h2>
         <div class="tablewrap">
           <table>
@@ -50,6 +67,7 @@
                 <th>Sân</th>
                 <th>Ngày</th>
                 <th>Tiền</th>
+                <th>Giảm giá</th>
                 <th>Trạng thái</th>
               </tr>
             </thead>

@@ -39,10 +39,12 @@ class AuthController extends Controller {
         $currentPassword = (string)($b['current_password'] ?? '');
         $newPassword = (string)($b['new_password'] ?? '');
         $confirmPassword = (string)($b['confirm_password'] ?? '');
+        $version = filter_var($b['profile_version'] ?? null, FILTER_VALIDATE_INT);
 
         if (mb_strlen($name) < 2 || mb_strlen($name) > 60) Http::error('Họ tên từ 2–60 ký tự.', 422);
         if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 120) Http::error('Email không hợp lệ.', 422);
         if (!preg_match('/^(0|\+84)\d{9}$/', $phone)) Http::error('Số điện thoại không hợp lệ.', 422);
+        if ($version === false || $version < 1) Http::error('Dữ liệu hồ sơ đã cũ. Hãy tải lại trang rồi thử lại.', 409);
         if (User::emailTaken($email, (int)$u['id'])) Http::error('Email này đã được tài khoản khác sử dụng.', 409);
 
         $changingPassword = $currentPassword !== '' || $newPassword !== '' || $confirmPassword !== '';
@@ -56,13 +58,14 @@ class AuthController extends Controller {
         }
 
         try {
-            User::updateProfile((int)$u['id'], $name, $email, $phone, $changingPassword ? $newPassword : null);
+            $updated = User::updateProfile((int)$u['id'], $name, $email, $phone, $version, $changingPassword ? $newPassword : null);
         } catch (PDOException $e) {
             if ($e->getCode() === '23000') Http::error('Email này đã được tài khoản khác sử dụng.', 409);
             throw $e;
         }
+        if (!$updated) Http::error('Hồ sơ đã được cập nhật ở nơi khác. Tải lại trang để xem thay đổi rồi thử lại.', 409);
         Audit::log($changingPassword ? 'profile_password_update' : 'profile_update', '', (int)$u['id']);
-        Http::json(['user' => ['name' => $name, 'email' => $email, 'phone' => $phone]]);
+        Http::json(['user' => ['name' => $name, 'email' => $email, 'phone' => $phone, 'profile_version' => $version + 1]]);
     }
     function logout(): void {
         if (!Auth::csrfOk()) Http::error('Phiên không hợp lệ.', 419);

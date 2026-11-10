@@ -13,6 +13,7 @@ $r->add('POST', '/api/register', 'AuthController', 'register');
 $r->add('POST', '/api/logout',   'AuthController', 'logout');
 $r->add('POST', '/api/profile',  'AuthController', 'updateProfile');
 $r->add('GET',  '/api/notifications', 'NotificationController', 'list');
+$r->add('GET',  '/api/notifications/ws-ticket', 'NotificationController', 'wsTicket');
 $r->add('POST', '/api/notifications/read', 'NotificationController', 'markRead');
 $r->add('POST', '/api/notifications/read-all', 'NotificationController', 'markAllRead');
 // --- API người đặt sân ---
@@ -29,6 +30,7 @@ $r->add('POST', '/api/match-player-request', 'BookingController', 'requestGuestP
 $r->add('POST', '/api/match-player-decision', 'BookingController', 'decideGuestPlayer');
 $r->add('POST', '/api/match-player-manage', 'BookingController', 'manageGuestPlayers');
 $r->add('POST', '/api/book',           'BookingController', 'book');
+$r->add('POST', '/api/voucher-quote',  'BookingController', 'quoteVoucher');
 $r->add('GET',  '/api/pay',            'BookingController', 'pay');
 $r->add('GET',  '/api/status',         'BookingController', 'status');
 $r->add('GET',  '/api/cancel-fee-pay', 'BookingController', 'cancelFeePay');
@@ -56,4 +58,6 @@ $r->add('POST', '/api/owner/cancel-booking', 'OwnerController', 'cancelBooking')
 $r->add('GET',  '/api/admin/overview', 'AdminController', 'overview');
 $r->add('POST', '/api/admin/user',     'AdminController', 'userAction');
 $r->add('POST', '/api/admin/review',   'AdminController', 'reviewAction');
+$r->add('POST', '/api/admin/voucher',  'AdminController', 'createVoucher');
+$r->add('POST', '/api/admin/voucher-toggle', 'AdminController', 'toggleVoucher');
 return $r;

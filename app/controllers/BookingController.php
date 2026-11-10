@@ -5,6 +5,22 @@ class BookingController extends Controller {
         return $x && $x->format('Y-m-d') === $d && $d >= date('Y-m-d') && $d <= date('Y-m-d', strtotime('+13 days'));
     }
 
+    private function bookingSelection(array $body): array {
+        $date = (string)($body['date'] ?? '');
+        $hours = array_values(array_unique(array_map('intval', (array)($body['hours'] ?? []))));
+        sort($hours);
+        if (!$this->validDate($date)) Http::error('Ngày không hợp lệ.', 422);
+        if (!$hours || count($hours) > 6) Http::error('Chọn từ 1 đến 6 giờ liên tiếp.', 422);
+        for ($i = 1; $i < count($hours); $i++) if ($hours[$i] !== $hours[$i-1] + 1) Http::error('Các khung giờ phải liền nhau.', 422);
+        foreach ($hours as $hour) {
+            if ($hour < OPEN_HOUR || $hour >= CLOSE_HOUR) Http::error('Khung giờ không hợp lệ.', 422);
+            if ($date === date('Y-m-d') && $hour <= (int)date('G')) Http::error('Khung giờ này đã qua.', 422);
+        }
+        $pitch = Pitch::bookable((int)($body['pitch_id'] ?? 0));
+        if (!$pitch) Http::error('Sân không khả dụng.', 404);
+        return [$pitch, $date, $hours];
+    }
+
     function slots(): void {
         Booking::expireHolds();
         $date = (string)($_GET['date'] ?? date('Y-m-d'));
@@ -18,6 +34,8 @@ class BookingController extends Controller {
                 'id' => $vid,
                 'name' => $p['venue_name'],
                 'address' => (string)$p['address'],
+                'latitude' => $p['latitude'] === null ? null : (float)$p['latitude'],
+                'longitude' => $p['longitude'] === null ? null : (float)$p['longitude'],
                 'owner_name' => $p['owner_name'],
                 'owner_phone' => $p['owner_phone'],
                 'pitches' => [],
@@ -90,11 +108,11 @@ class BookingController extends Controller {
         $playersNeeded = filter_var($body['players_needed'] ?? null, FILTER_VALIDATE_INT);
         if ($bookingId < 1 || mb_strlen($teamName) < 2 || mb_strlen($teamName) > 80
             || !preg_match('/^(0|\\+84)\\d{9}$/', $phone) || mb_strlen($description) > 500
-            || $playersNeeded === false || $playersNeeded < 1 || $playersNeeded > 30) {
-            Http::error('Kiểm tra thông tin đội và số cầu thủ cần tìm (1–30).', 422);
+            || $playersNeeded === false || $playersNeeded < 0 || $playersNeeded > 30) {
+            Http::error('Kiểm tra thông tin đội và số cầu thủ cần tìm (0–30).', 422);
         }
         if (!MatchChallenge::create($bookingId, (int)$user['id'], $teamName, $phone, $description, $playersNeeded)) {
-            Http::error('Chỉ có thể tạo kèo từ lịch đặt sân còn hiệu lực sắp diễn ra; mỗi đơn chỉ tạo được một kèo.', 409);
+            Http::error('Chỉ có thể đăng kèo từ lịch còn hiệu lực; kèo đang mở hoặc đã ghép không thể đăng lại.', 409);
         }
         Notification::notifyBookingCustomer($bookingId, 'Đã đăng kèo giao hữu', 'Kèo tìm đối thủ/đá vãng lai của bạn đã được đăng.');
         Notification::notifyBookingOwner($bookingId, 'Khách đã đăng kèo giao hữu',
@@ -207,8 +225,8 @@ class BookingController extends Controller {
         $playersNeeded = null;
         if ($action === 'capacity') {
             $playersNeeded = filter_var($body['players_needed'] ?? null, FILTER_VALIDATE_INT);
-            if ($playersNeeded === false || $playersNeeded < 1 || $playersNeeded > 30) {
-                Http::error('Số cầu thủ cần tìm phải từ 1 đến 30.', 422);
+            if ($playersNeeded === false || $playersNeeded < 0 || $playersNeeded > 30) {
+                Http::error('Số cầu thủ cần tìm phải từ 0 đến 30.', 422);
             }
         }
         if ($challengeId < 1 || !in_array($action, ['capacity', 'open', 'close'], true)) {
@@ -235,31 +253,25 @@ class BookingController extends Controller {
         Http::json(['ok' => true]);
     }
 
-    // Khung giờ chủ sân đã gỡ khỏi lịch không được gửi tới khách đặt sân.
+    // Keep blocked hours visible so customers can see availability and the owner's reason.
     private function buildSlots(array $pitch, string $date, array $bookedHours, array $unavailableHours): array {
         $slots = []; $now = (int)date('G'); $today = $date === date('Y-m-d');
         for ($h = OPEN_HOUR; $h < CLOSE_HOUR; $h++) {
-            if (!empty($unavailableHours[$h])) continue;
-            $status = !empty($bookedHours[$h]) ? 'booked' : (($today && $h <= $now) ? 'past' : 'free');
-            $slots[] = ['hour' => $h, 'price' => Pitch::price($pitch, $h), 'status' => $status];
+            $status = isset($unavailableHours[$h]) ? 'unavailable' : (!empty($bookedHours[$h]) ? 'booked' : (($today && $h <= $now) ? 'past' : 'free'));
+            $slots[] = ['hour' => $h, 'price' => Pitch::price($pitch, $h), 'status' => $status,
+                'reason' => $status === 'unavailable' ? (string)$unavailableHours[$h] : ''];
         }
         return $slots;
     }
 
     function book(): void {
         $u = $this->guard(['customer']); Booking::expireHolds(); $b = $this->body();
-        $date = (string)($b['date'] ?? '');
-        $hours = array_values(array_unique(array_map('intval', (array)($b['hours'] ?? [])))); sort($hours);
-        if (!$this->validDate($date)) Http::error('Ngày không hợp lệ.', 422);
-        if (!$hours || count($hours) > 6) Http::error('Chọn từ 1 đến 6 giờ liên tiếp.', 422);
-        for ($i = 1; $i < count($hours); $i++) if ($hours[$i] !== $hours[$i-1] + 1) Http::error('Các khung giờ phải liền nhau.', 422);
-        foreach ($hours as $h) {
-            if ($h < OPEN_HOUR || $h >= CLOSE_HOUR) Http::error('Khung giờ không hợp lệ.', 422);
-            if ($date === date('Y-m-d') && $h <= (int)date('G')) Http::error('Khung giờ này đã qua.', 422);
-        }
-        $pitch = Pitch::bookable((int)($b['pitch_id'] ?? 0));
-        if (!$pitch) Http::error('Sân không khả dụng.', 404);
-        $id = Booking::create((int)$u['id'], $pitch, $date, $hours);
+        [$pitch, $date, $hours] = $this->bookingSelection($b);
+        $voucherCode = strtoupper(trim((string)($b['voucher_code'] ?? '')));
+        if (mb_strlen($voucherCode) > 32) Http::error('Mã giảm giá không hợp lệ.', 422);
+        $result = Booking::create((int)$u['id'], $pitch, $date, $hours, $voucherCode);
+        if ($result['error'] !== null) Http::error($result['error'], 422);
+        $id = (int)$result['id'];
         if (!$id) Http::error('Khung giờ vừa được đặt hoặc chủ sân đã gỡ khỏi lịch. Vui lòng chọn lại.', 409);
         $bk = Booking::mine($id, (int)$u['id']); Audit::log('book', $bk['code']);
         Notification::notifyBookingParties(
@@ -272,8 +284,21 @@ class BookingController extends Controller {
         Http::json(['booking' => [
             'id' => (int)$bk['id'], 'code' => $bk['code'], 'date' => $bk['date'],
             'start_hour' => (int)$bk['start_hour'], 'end_hour' => (int)$bk['end_hour'],
+            'subtotal' => (int)$bk['subtotal'], 'discount' => (int)$bk['discount'],
             'total' => (int)$bk['total'], 'status' => $bk['status']
         ]]);
+    }
+
+    function quoteVoucher(): void {
+        $this->guard(['customer']);
+        [$pitch, , $hours] = $this->bookingSelection($this->body());
+        $body = $this->body();
+        $code = strtoupper(trim((string)($body['voucher_code'] ?? '')));
+        if (mb_strlen($code) > 32) Http::error('Mã giảm giá không hợp lệ.', 422);
+        $subtotal = array_sum(array_map(fn($hour) => Pitch::price($pitch, $hour), $hours));
+        $quote = Voucher::quote($code, $subtotal);
+        if (isset($quote['error'])) Http::error($quote['error'], 422);
+        Http::json(['quote' => $quote]);
     }
 
     function pay(): void {
