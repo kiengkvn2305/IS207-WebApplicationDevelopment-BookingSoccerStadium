@@ -1,7 +1,7 @@
 <?php
 class User {
     static function find(int $id): ?array {
-        return Database::q("SELECT id,name,email,phone,role,status,created_at FROM users WHERE id=?", [$id])->fetch() ?: null;
+        return Database::q("SELECT id,name,email,phone,role,status,profile_version,created_at FROM users WHERE id=?", [$id])->fetch() ?: null;
     }
     static function byEmail(string $email): ?array {
         return Database::q("SELECT * FROM users WHERE email=?", [$email])->fetch() ?: null;
@@ -12,25 +12,33 @@ class User {
     static function emailTaken(string $email, int $exceptId): bool {
         return (bool)Database::q("SELECT 1 FROM users WHERE email=? AND id<>? LIMIT 1", [$email, $exceptId])->fetchColumn();
     }
-    static function updateProfile(int $id, string $name, string $email, string $phone, ?string $password = null): void {
+    static function updateProfile(int $id, string $name, string $email, string $phone, int $version, ?string $password = null): bool {
         if ($password === null) {
-            Database::q("UPDATE users SET name=?,email=?,phone=? WHERE id=?", [$name, $email, $phone, $id]);
-            return;
+            return Database::q("UPDATE users SET name=?,email=?,phone=?,profile_version=profile_version+1
+                WHERE id=? AND profile_version=?", [$name, $email, $phone, $id, $version])->rowCount() > 0;
         }
-        Database::q("UPDATE users SET name=?,email=?,phone=?,password_hash=? WHERE id=?",
-            [$name, $email, $phone, password_hash($password, PASSWORD_DEFAULT), $id]);
+        return Database::q("UPDATE users SET name=?,email=?,phone=?,password_hash=?,profile_version=profile_version+1
+            WHERE id=? AND profile_version=?",
+            [$name, $email, $phone, password_hash($password, PASSWORD_DEFAULT), $id, $version])->rowCount() > 0;
     }
     static function create(string $name, string $email, string $phone, string $pw, string $role, string $venue): bool {
         $pdo = Database::pdo();
         try {
-            $pdo->beginTransaction();
+            Database::beginTransaction();
             Database::q("INSERT INTO users(name,email,phone,password_hash,role,status) VALUES(?,?,?,?,?,?)",
                 [$name, $email, $phone, password_hash($pw, PASSWORD_DEFAULT), $role, $role === 'owner' ? 'pending' : 'active']);
             $id = (int)$pdo->lastInsertId();
             if ($role === 'owner') Database::q("INSERT INTO owner_profiles(user_id,venue_name) VALUES(?,?)", [$id, mb_substr($venue, 0, 100)]);
-            $pdo->commit(); Audit::log('register', $role, $id);
+            Database::commit(); Audit::log('register', $role, $id);
             return true;
-        } catch (PDOException $e) { $pdo->rollBack(); return false; }   // trùng email
+        } catch (PDOException $e) {
+            if ($pdo->inTransaction()) Database::rollBack();
+            if ((string)$e->getCode() === '23000') return false;
+            throw $e;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) Database::rollBack();
+            throw $e;
+        }
     }
     static function failedAttempts(string $email, string $ip): int {
         return (int)Database::q("SELECT COUNT(*) FROM login_attempts WHERE created_at > NOW() - INTERVAL 15 MINUTE AND (email=? OR ip=?)", [$email, $ip])->fetchColumn();

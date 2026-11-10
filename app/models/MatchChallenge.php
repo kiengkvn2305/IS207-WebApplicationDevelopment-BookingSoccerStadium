@@ -90,29 +90,39 @@ class MatchChallenge {
 
     static function create(int $bookingId, int $userId, string $teamName, string $phone, string $description, int $playersNeeded): bool {
         $pdo = Database::pdo();
-        $pdo->beginTransaction();
+        Database::beginTransaction();
         try {
             $booking = Database::q("SELECT id FROM bookings
                 WHERE id=? AND user_id=? AND status IN ('confirmed','paid')
                 AND TIMESTAMP(date,MAKETIME(start_hour,0,0))>NOW() FOR UPDATE", [$bookingId, $userId])->fetchColumn();
-            if (!$booking) { $pdo->rollBack(); return false; }
-            Database::q("INSERT INTO match_challenges(booking_id,creator_id,team_name,contact_phone,description,players_needed)
-                VALUES(?,?,?,?,?,?)", [$bookingId, $userId, $teamName, $phone, $description, $playersNeeded]);
-            $pdo->commit();
+            if (!$booking) { Database::rollBack(); return false; }
+            $existing = Database::q("SELECT id,status FROM match_challenges WHERE booking_id=? FOR UPDATE", [$bookingId])->fetch();
+            if ($existing) {
+                if ($existing['status'] !== 'cancelled') { Database::rollBack(); return false; }
+                Database::q("UPDATE match_requests SET status='declined'
+                    WHERE challenge_id=? AND status IN ('pending','accepted')", [$existing['id']]);
+                Database::q("UPDATE match_challenges SET creator_id=?,team_name=?,contact_phone=?,description=?,
+                    players_needed=?,join_open=?,status='open' WHERE id=?",
+                    [$userId, $teamName, $phone, $description, $playersNeeded, $playersNeeded > 0 ? 1 : 0, $existing['id']]);
+            } else {
+                Database::q("INSERT INTO match_challenges(booking_id,creator_id,team_name,contact_phone,description,players_needed,join_open)
+                    VALUES(?,?,?,?,?,?,?)", [$bookingId, $userId, $teamName, $phone, $description, $playersNeeded, $playersNeeded > 0 ? 1 : 0]);
+            }
+            Database::commit();
             return true;
         } catch (PDOException $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ($pdo->inTransaction()) Database::rollBack();
             if ((string)$e->getCode() === '23000') return false;
             throw $e;
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ($pdo->inTransaction()) Database::rollBack();
             throw $e;
         }
     }
 
     static function request(int $challengeId, int $userId, string $teamName, string $phone, string $message, bool $guestPlayer = false): bool {
         $pdo = Database::pdo();
-        $pdo->beginTransaction();
+        Database::beginTransaction();
         try {
             $challengeStatus = $guestPlayer ? "c.status IN ('open','matched')" : "c.status='open'";
             $challenge = Database::q("SELECT c.id,c.creator_id,c.join_open,c.players_needed,
@@ -125,7 +135,7 @@ class MatchChallenge {
             if (!$challenge || (int)$challenge['creator_id'] === $userId
                 || ($guestPlayer && (!(int)$challenge['join_open']
                     || (int)$challenge['accepted_players'] >= (int)$challenge['players_needed']))) {
-                $pdo->rollBack();
+                Database::rollBack();
                 return false;
             }
             $requestType = $guestPlayer ? 'player' : 'opponent';
@@ -134,7 +144,7 @@ class MatchChallenge {
                 [$challengeId, $userId, $requestType])->fetch();
             if ($existing) {
                 if ($existing['status'] !== 'declined') {
-                    $pdo->rollBack();
+                    Database::rollBack();
                     return false;
                 }
                 Database::q("UPDATE match_requests SET request_type=?,team_name=?,contact_phone=?,message=?,
@@ -144,27 +154,27 @@ class MatchChallenge {
                 Database::q("INSERT INTO match_requests(challenge_id,applicant_id,request_type,team_name,contact_phone,message)
                     VALUES(?,?,?,?,?,?)", [$challengeId, $userId, $requestType, $teamName, $phone, $message]);
             }
-            $pdo->commit();
+            Database::commit();
             return true;
         } catch (PDOException $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ($pdo->inTransaction()) Database::rollBack();
             if ((string)$e->getCode() === '23000') return false;
             throw $e;
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ($pdo->inTransaction()) Database::rollBack();
             throw $e;
         }
     }
 
     static function decide(int $requestId, int $userId, string $action): bool {
         $pdo = Database::pdo();
-        $pdo->beginTransaction();
+        Database::beginTransaction();
         try {
             $request = Database::q("SELECT r.id,r.challenge_id,r.status,c.status challenge_status
                 FROM match_requests r JOIN match_challenges c ON c.id=r.challenge_id
                 WHERE r.id=? AND c.creator_id=? AND r.request_type='opponent' FOR UPDATE", [$requestId, $userId])->fetch();
             if (!$request || $request['challenge_status'] !== 'open' || $request['status'] !== 'pending') {
-                $pdo->rollBack();
+                Database::rollBack();
                 return false;
             }
             if ($action === 'accept') {
@@ -175,17 +185,17 @@ class MatchChallenge {
             } else {
                 Database::q("UPDATE match_requests SET status='declined' WHERE id=?", [$requestId]);
             }
-            $pdo->commit();
+            Database::commit();
             return true;
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ($pdo->inTransaction()) Database::rollBack();
             throw $e;
         }
     }
 
     static function decidePlayerRequest(int $requestId, int $userId, string $action): bool {
         $pdo = Database::pdo();
-        $pdo->beginTransaction();
+        Database::beginTransaction();
         try {
             $request = Database::q("SELECT r.id,r.challenge_id,r.status,c.status challenge_status,
                     c.players_needed,
@@ -194,7 +204,7 @@ class MatchChallenge {
                 FROM match_requests r JOIN match_challenges c ON c.id=r.challenge_id
                 WHERE r.id=? AND c.creator_id=? AND r.request_type='player' FOR UPDATE", [$requestId, $userId])->fetch();
             if (!$request || !in_array($request['challenge_status'], ['open','matched'], true)) {
-                $pdo->rollBack();
+                Database::rollBack();
                 return false;
             }
             if ($action === 'accept' && $request['status'] === 'pending'
@@ -208,20 +218,20 @@ class MatchChallenge {
             } elseif ($action === 'remove' && $request['status'] === 'accepted') {
                 Database::q("UPDATE match_requests SET status='declined' WHERE id=?", [$requestId]);
             } else {
-                $pdo->rollBack();
+                Database::rollBack();
                 return false;
             }
-            $pdo->commit();
+            Database::commit();
             return true;
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ($pdo->inTransaction()) Database::rollBack();
             throw $e;
         }
     }
 
     static function manageGuestPlayers(int $challengeId, int $userId, string $action, ?int $playersNeeded = null): bool {
         $pdo = Database::pdo();
-        $pdo->beginTransaction();
+        Database::beginTransaction();
         try {
             $challenge = Database::q("SELECT c.id,c.players_needed,c.join_open,
                     (SELECT COUNT(*) FROM match_requests accepted WHERE accepted.challenge_id=c.id
@@ -230,13 +240,13 @@ class MatchChallenge {
                 WHERE c.id=? AND c.creator_id=? AND c.status IN ('open','matched') FOR UPDATE",
                 [$challengeId, $userId])->fetch();
             if (!$challenge) {
-                $pdo->rollBack();
+                Database::rollBack();
                 return false;
             }
             if ($action === 'capacity') {
-                if ($playersNeeded === null || $playersNeeded < 1 || $playersNeeded > 30
+                if ($playersNeeded === null || $playersNeeded < 0 || $playersNeeded > 30
                     || $playersNeeded < (int)$challenge['accepted_players']) {
-                    $pdo->rollBack();
+                    Database::rollBack();
                     return false;
                 }
                 Database::q("UPDATE match_challenges SET players_needed=?,
@@ -246,24 +256,39 @@ class MatchChallenge {
                 Database::q("UPDATE match_challenges SET join_open=0 WHERE id=?", [$challengeId]);
             } elseif ($action === 'open') {
                 if ((int)$challenge['accepted_players'] >= (int)$challenge['players_needed']) {
-                    $pdo->rollBack();
+                    Database::rollBack();
                     return false;
                 }
                 Database::q("UPDATE match_challenges SET join_open=1 WHERE id=?", [$challengeId]);
             } else {
-                $pdo->rollBack();
+                Database::rollBack();
                 return false;
             }
-            $pdo->commit();
+            Database::commit();
             return true;
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ($pdo->inTransaction()) Database::rollBack();
             throw $e;
         }
     }
 
     static function cancel(int $challengeId, int $userId): bool {
-        return Database::q("UPDATE match_challenges SET status='cancelled'
-            WHERE id=? AND creator_id=? AND status='open'", [$challengeId, $userId])->rowCount() > 0;
+        $pdo = Database::pdo();
+        Database::beginTransaction();
+        try {
+            $challenge = Database::q("SELECT id FROM match_challenges
+                WHERE id=? AND creator_id=? AND status='open' FOR UPDATE", [$challengeId, $userId])->fetch();
+            if (!$challenge) {
+                Database::rollBack();
+                return false;
+            }
+            Database::q("UPDATE match_challenges SET status='cancelled' WHERE id=?", [$challengeId]);
+            Notification::notifyChallengeApplicants($challengeId, 'Kèo giao hữu đã đóng', 'Đội tạo kèo đã đóng kèo này.');
+            Database::commit();
+            return true;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) Database::rollBack();
+            throw $e;
+        }
     }
 }

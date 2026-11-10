@@ -42,6 +42,7 @@ const App = (() => {
       $('#profileName').value = user.name || '';
       $('#profileEmail').value = user.email || '';
       $('#profilePhone').value = user.phone || '';
+      form.elements.profile_version.value = user.profile_version || 1;
       $('#profileRole').value = roles[user.role] || 'Người dùng';
       resetPasswordFields();
       $('#profileCurrentPassword').value = '';
@@ -66,6 +67,7 @@ const App = (() => {
           name: $('#profileName').value,
           email: $('#profileEmail').value,
           phone: $('#profilePhone').value,
+          profile_version: Number(form.elements.profile_version.value),
           current_password: $('#profileCurrentPassword').value,
           new_password: $('#profileNewPassword').value,
           confirm_password: $('#profileConfirmPassword').value
@@ -131,7 +133,9 @@ const App = (() => {
       if (loading) return;
       loading = true;
       try {
-        render(await api('notifications'));
+        const data = await api('notifications');
+        render(data);
+        return data;
       } catch (error) {
         list.innerHTML = `<p class="error notification-error">${esc(error.message || 'Không thể tải thông báo.')}</p>`;
       } finally {

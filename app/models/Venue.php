@@ -29,9 +29,7 @@ class Venue {
         $marks = implode(',', array_fill(0, count($ownerIds), '?'));
         $result = [];
         foreach (Database::q("SELECT owner_id,amenity FROM venue_amenities WHERE owner_id IN ($marks) ORDER BY amenity", $ownerIds) as $row) {
-            if (isset(self::AMENITIES[$row['amenity']])) {
-                $result[(int)$row['owner_id']][] = self::AMENITIES[$row['amenity']];
-            }
+            $result[(int)$row['owner_id']][] = self::AMENITIES[$row['amenity']] ?? $row['amenity'];
         }
         return $result;
     }
@@ -80,46 +78,67 @@ class Venue {
 
     static function addImage(int $ownerId, string $path): bool {
         $pdo = Database::pdo();
-        $pdo->beginTransaction();
+        Database::beginTransaction();
         try {
             if (!Database::q("SELECT user_id FROM owner_profiles WHERE user_id=? FOR UPDATE", [$ownerId])->fetch()) {
-                $pdo->rollBack();
+                Database::rollBack();
                 return false;
             }
             $count = (int)Database::q("SELECT COUNT(*) FROM venue_images WHERE owner_id=?", [$ownerId])->fetchColumn();
-            if ($count >= 8) { $pdo->rollBack(); return false; }
+            if ($count >= 8) { Database::rollBack(); return false; }
             Database::q("INSERT INTO venue_images(owner_id,image_path) VALUES(?,?)", [$ownerId, $path]);
-            $pdo->commit();
+            Database::commit();
             return true;
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ($pdo->inTransaction()) Database::rollBack();
             throw $e;
         }
     }
 
     static function deleteImage(int $imageId, int $ownerId): ?string {
-        $row = Database::q("SELECT image_path FROM venue_images WHERE id=? AND owner_id=?", [$imageId, $ownerId])->fetch();
-        if (!$row) return null;
-        Database::q("DELETE FROM venue_images WHERE id=? AND owner_id=?", [$imageId, $ownerId]);
-        return $row['image_path'];
+        $pdo = Database::pdo();
+        Database::beginTransaction();
+        try {
+            if (!Database::q("SELECT user_id FROM owner_profiles WHERE user_id=? FOR UPDATE", [$ownerId])->fetch()) {
+                Database::rollBack();
+                return null;
+            }
+            $row = Database::q("SELECT image_path FROM venue_images WHERE id=? AND owner_id=? FOR UPDATE",
+                [$imageId, $ownerId])->fetch();
+            if (!$row) {
+                Database::rollBack();
+                return null;
+            }
+            Database::q("DELETE FROM venue_images WHERE id=? AND owner_id=?", [$imageId, $ownerId]);
+            Database::commit();
+            return $row['image_path'];
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) Database::rollBack();
+            throw $e;
+        }
     }
 
     static function saveAmenities(int $ownerId, array $amenities): void {
-        $amenities = array_values(array_unique($amenities));
+        $amenities = array_values(array_unique(array_filter(array_map('trim', $amenities), fn($amenity) => $amenity !== '')));
         $pdo = Database::pdo();
-        $pdo->beginTransaction();
+        Database::beginTransaction();
         try {
+            if (!Database::q("SELECT user_id FROM owner_profiles WHERE user_id=? FOR UPDATE", [$ownerId])->fetch()) {
+                Database::rollBack();
+                throw new RuntimeException('Không tìm thấy hồ sơ cụm sân.');
+            }
             Database::q("DELETE FROM venue_amenities WHERE owner_id=?", [$ownerId]);
             foreach ($amenities as $amenity) Database::q("INSERT INTO venue_amenities(owner_id,amenity) VALUES(?,?)", [$ownerId, $amenity]);
-            $pdo->commit();
+            Database::commit();
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ($pdo->inTransaction()) Database::rollBack();
             throw $e;
         }
     }
 
     static function amenities(int $ownerId): array {
-        return array_column(Database::q("SELECT amenity FROM venue_amenities WHERE owner_id=? ORDER BY amenity", [$ownerId])->fetchAll(), 'amenity');
+        $rows = Database::q("SELECT amenity FROM venue_amenities WHERE owner_id=? ORDER BY amenity", [$ownerId])->fetchAll();
+        return array_map(fn($row) => self::AMENITIES[$row['amenity']] ?? $row['amenity'], $rows);
     }
 
     static function reviews(int $ownerId, ?int $userId): array {

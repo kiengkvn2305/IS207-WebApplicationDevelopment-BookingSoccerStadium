@@ -57,6 +57,26 @@
     $('#bookingCatalog').hidden = false;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+  $('#bookingDate').addEventListener('change', () => {
+    if ($('#bookingDate').value) selectDate($('#bookingDate').value);
+  });
+  $('#useCurrentLocation').onclick = () => {
+    if (!navigator.geolocation) {
+      $('#locationStatus').textContent = 'Trình duyệt không hỗ trợ lấy vị trí.';
+      return;
+    }
+    $('#locationStatus').textContent = 'Đang lấy vị trí hiện tại...';
+    navigator.geolocation.getCurrentPosition(position => {
+      state.currentLocation = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+      $('#locationStatus').textContent = 'Đang lọc các cụm sân có tọa độ trong bán kính đã chọn.';
+      clearSelection();
+      renderVenues();
+    }, error => {
+      $('#locationStatus').textContent = error.code === error.PERMISSION_DENIED
+        ? 'Bạn chưa cấp quyền vị trí. Có thể tiếp tục lọc bằng khu vực.'
+        : 'Không lấy được vị trí. Hãy thử lại hoặc lọc theo khu vực.';
+    }, { enableHighAccuracy: true, timeout: 10000 });
+  };
 
   /* ========== 1) Hằng số & trạng thái ========== */
   const DOW = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -71,6 +91,7 @@
     venueId: null,         // Chọn cụm sân trước khi hiển thị danh sách giờ
     pitchId: null,         // sân đang chọn giờ
     hours: new Set(),      // các giờ đang chọn
+    currentLocation: null,
   };
   let myMatches = [];
   let matchCache = [];
@@ -90,6 +111,7 @@
   }
   async function selectDate(date) {
     state.date = date; clearSelection();
+    $('#bookingDate').value = date;
     document.querySelectorAll('.day').forEach(b => b.setAttribute('aria-pressed', b.dataset.date === date));
     await loadSlots();
   }
@@ -120,6 +142,15 @@
     }
   }
 
+  function distanceKm(from, to) {
+    const radians = value => value * Math.PI / 180;
+    const dLat = radians(Number(to.latitude) - from.latitude);
+    const dLng = radians(Number(to.longitude) - from.longitude);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(radians(from.latitude))
+      * Math.cos(radians(Number(to.latitude))) * Math.sin(dLng / 2) ** 2;
+    return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
   function renderVenues() {
     const box = $('#pitches'); box.innerHTML = '';
     $('#h-slot').textContent = state.venueId === null ? 'Chọn cụm sân' : 'Chọn sân và giờ đá';
@@ -128,15 +159,29 @@
     const areaQuery = $('#areaSearch').value.trim().toLocaleLowerCase('vi');
     const typeFilter = $('#typeFilter').value;
     const hourFilter = $('#hourFilter').value;
+    const minPrice = $('#minPriceFilter').value === '' ? null : Number($('#minPriceFilter').value);
+    const maxPrice = $('#maxPriceFilter').value === '' ? null : Number($('#maxPriceFilter').value);
+    const distanceLimit = Number($('#distanceFilter').value);
     const venues = state.venues.map(v => ({
       ...v,
+      distance: state.currentLocation && v.latitude !== null && v.longitude !== null
+        ? distanceKm(state.currentLocation, v) : null,
       pitches: v.pitches.filter(p => {
         const name = `${v.name} ${p.name}`.toLocaleLowerCase('vi');
         const area = (v.address || '').toLocaleLowerCase('vi');
-        const available = p.slots.some(s => s.status === 'free' && (hourFilter === '' || s.hour === Number(hourFilter)));
+        const available = p.slots.some(s => s.status === 'free'
+          && (hourFilter === '' || s.hour === Number(hourFilter))
+          && (minPrice === null || s.price >= minPrice)
+          && (maxPrice === null || s.price <= maxPrice));
         return name.includes(pitchQuery) && area.includes(areaQuery) && (!typeFilter || p.type === typeFilter) && available;
       })
-    })).filter(v => v.pitches.length);
+    })).filter(v => v.pitches.length
+      && (!state.currentLocation || (v.distance !== null && v.distance <= distanceLimit)));
+    if (minPrice !== null && maxPrice !== null && minPrice > maxPrice) {
+      $('#availabilitySummary').textContent = 'Giá tối thiểu không thể lớn hơn giá tối đa.';
+      box.innerHTML = '<p class="empty">Vui lòng chỉnh lại khoảng giá.</p>';
+      return;
+    }
     const availableCount = venues.length;
     $('#availabilitySummary').textContent = hourFilter === ''
       ? `${dmy(state.date)} · ${availableCount} cụm sân có ít nhất một giờ còn trống. Chọn giờ cụ thể để lọc nhanh.`
@@ -146,7 +191,7 @@
       venues.forEach(v => {
         const card = make('article', 'venue-card');
         const open = make('button', 'venue-card-open',
-          `<span class="venue-card-title">${esc(v.name)}</span><span class="venue-card-address">${v.address ? `📍 ${esc(v.address)}` : 'Chưa cập nhật địa chỉ'}</span>` +
+          `<span class="venue-card-title">${esc(v.name)}</span><span class="venue-card-address">${v.address ? `📍 ${esc(v.address)}` : 'Chưa cập nhật địa chỉ'}${v.distance === null ? '' : ` · ${v.distance.toFixed(1)} km`}</span>` +
           `<span class="venue-card-rating">${v.rating_count ? `★ ${esc(v.rating_average)} · ${v.rating_count} đánh giá` : 'Chưa có đánh giá'}</span>` +
           `<span class="venue-card-action">Xem sân và giờ còn trống →</span>`);
         open.type = 'button';
@@ -220,7 +265,10 @@
     $('#matchBookingInfo').textContent = `${booking.venue} · ${booking.pitch} · ${dmy(booking.date)} · ${pad(booking.from)}–${pad(booking.to)}`;
     $('#matchTeamName').value = user.name || '';
     $('#matchPhone').value = user.phone || '';
+    $('#matchGuestEnabled').checked = false;
     $('#matchPlayersNeeded').value = '1';
+    $('#matchPlayersNeeded').disabled = true;
+    $('#matchPlayersNeededField').hidden = true;
     $('#matchDescription').value = '';
     $('#createMatchError').textContent = '';
     $('#createMatchDlg').showModal();
@@ -266,6 +314,8 @@
     $('#matches').innerHTML = matches.length ? matches.map(match => {
       const action = match.status !== 'open'
         ? ''
+        : match.request_status === 'declined'
+          ? `<button type="button" class="btn sm" data-request-match="${+match.id}">Gửi lại lời thách đấu</button>`
         : match.request_status
         ? `<span class="tag ${match.request_status === 'accepted' ? 'paid' : 'pending'}">${esc(matchStatuses[match.request_status] || match.request_status)}</span>`
         : user?.role === 'customer'
@@ -273,7 +323,9 @@
           : '<a class="btn ghost sm" href="login">Đăng nhập để tham gia</a>';
       const canJoinAsPlayer = user?.role === 'customer' && Number(match.join_open)
         && Number(match.players_needed_remaining) > 0;
-      const playerAction = match.player_request_status
+      const playerAction = match.player_request_status === 'declined' && canJoinAsPlayer
+        ? `<button type="button" class="btn ghost sm" data-join-player="${+match.id}">Gửi lại yêu cầu đá vãng lai</button>`
+        : match.player_request_status
         ? `<span class="tag ${match.player_request_status === 'accepted' ? 'paid' : match.player_request_status === 'pending' ? 'pending' : 'cancelled'}">${match.player_request_status === 'accepted' ? 'Bạn đã được nhận vào đội' : match.player_request_status === 'pending' ? 'Đang chờ duyệt đá vãng lai' : 'Yêu cầu trước đã bị từ chối'}</span>`
         : canJoinAsPlayer
           ? `<button type="button" class="btn ghost sm" data-join-player="${+match.id}">Xin đá vãng lai</button>`
@@ -283,7 +335,9 @@
       return `<article class="match-card"><div class="match-card-head"><div><p class="eyebrow">${match.status === 'matched' ? 'ĐỘI ĐANG NHẬN CẦU THỦ VÃNG LAI' : 'ĐỘI ĐANG TÌM ĐỐI THỦ'}</p><h3>${esc(match.team_name)}</h3></div><span class="tag pending">${+match.request_count} lời mời đội</span></div>
         <p><b>${esc(match.venue_name)} · ${esc(match.pitch)} (${esc(match.pitch_type)})</b></p>
         <p>${dmy(match.date)} · ${pad(match.start_hour)}–${pad(match.end_hour)}</p>
-        <p>Đá vãng lai: ${+match.accepted_players}/${+match.players_needed} người đã được nhận${Number(match.join_open) && +match.players_needed_remaining > 0 ? ` · còn ${+match.players_needed_remaining} chỗ` : ' · hiện không nhận thêm người'}</p>
+        <p>${+match.players_needed > 0
+          ? `Đá vãng lai: ${+match.accepted_players}/${+match.players_needed} người đã được nhận${Number(match.join_open) && +match.players_needed_remaining > 0 ? ` · còn ${+match.players_needed_remaining} chỗ` : ' · hiện không nhận thêm người'}`
+          : 'Đội không tìm thêm người đá vãng lai.'}</p>
         <p>${esc(match.address || 'Chưa cập nhật địa chỉ')}</p>
         ${match.description ? `<p>${esc(match.description)}</p>` : ''}
         <p class="match-contact">Liên hệ đội ${esc(match.team_name)}: <a href="tel:${encodeURIComponent(match.contact_phone)}">${esc(match.contact_phone)}</a></p>
@@ -310,9 +364,9 @@
     const ownCards = myMatches.map(match => `<article class="match-card my-match-card">
       <div class="match-card-head"><div><h3>${esc(match.team_name)}</h3><p>${esc(match.venue_name)} · ${esc(match.pitch)} · ${dmy(match.date)} ${pad(match.start_hour)}–${pad(match.end_hour)}</p></div>
         <span class="tag ${match.status === 'matched' ? 'paid' : match.status === 'open' ? 'pending' : 'cancelled'}">${esc(matchStatuses[match.status] || match.status)}</span></div>
-      <p>Đá vãng lai: ${+(match.accepted_players || 0)}/${+match.players_needed} người đã được nhận.</p>
+      <p>${+match.players_needed > 0 ? `Đá vãng lai: ${+(match.accepted_players || 0)}/${+match.players_needed} người đã được nhận.` : 'Đội không tìm thêm người đá vãng lai.'}</p>
       ${match.status !== 'cancelled' ? `<div class="match-player-controls">
-        <label>Số chỗ cần thêm<input type="number" min="${Math.max(1, +match.accepted_players)}" max="30" value="${+match.players_needed}" data-player-capacity="${+match.id}"></label>
+        <label>Số chỗ cần thêm<input type="number" min="${+match.accepted_players}" max="30" value="${+match.players_needed}" data-player-capacity="${+match.id}"></label>
         <button class="btn ghost sm" type="button" data-save-player-capacity="${+match.id}">Cập nhật số chỗ</button>
         ${+match.join_open
           ? `<button class="btn ghost sm" type="button" data-manage-players="close" data-id="${+match.id}">Ngừng nhận người</button>`
@@ -320,6 +374,7 @@
             ? `<button class="btn ghost sm" type="button" data-manage-players="open" data-id="${+match.id}">Mở nhận người</button>`
             : '<span class="hint">Đã đủ số người cần tìm</span>'}
       </div>` : ''}
+      ${match.status === 'cancelled' ? `<button class="btn sm" type="button" data-reopen-match="${+match.booking_id}">Đăng lại kèo</button>` : ''}
       ${(playerRequestsByChallenge.get(Number(match.id)) || []).length
         ? `<h4 class="subheading">Yêu cầu đá vãng lai</h4>${(playerRequestsByChallenge.get(Number(match.id)) || []).map(request => `<div class="match-request-row">
           <b>${esc(request.team_name)}</b> · <a href="tel:${encodeURIComponent(request.contact_phone)}">${esc(request.contact_phone)}</a>
@@ -378,6 +433,7 @@
   function slotButton(p, s) {
     const b = make('button', 'slot ' + (s.status === 'free' ? '' : s.status),
       `<b>${pad(s.hour)}–${pad(s.hour + 1)}</b><small>${s.status === 'booked' ? 'Đã đặt' : s.status === 'unavailable' ? 'Sân đóng' : money(s.price)}</small>`);
+    if (s.reason) b.title = `Lý do khóa: ${s.reason}`;
     b.type = 'button'; b.disabled = s.status !== 'free';
     b.setAttribute('aria-pressed', state.pitchId === p.id && state.hours.has(s.hour));
     b.onclick = () => toggleSlot(p, s);
@@ -406,21 +462,68 @@
   }
 
   /* ========== 5) Đặt sân ========== */
+  let voucherQuote = null;
+  const renderBookingTotals = (subtotal, discount = 0, total = subtotal) => {
+    $('#bookingTotals').innerHTML = `Tạm tính: <b>${money(subtotal)}</b>${discount
+      ? `<br>Giảm giá: <b>−${money(discount)}</b><br>Thanh toán: <b>${money(total)}</b>` : ''}`;
+  };
   $('#openBook').onclick = () => {
     const sel = currentSelection(); if (!sel) return;
     if (!user) { location.href = 'login'; return; }
     $('#summary').textContent = `${sel.p.name}, ${dmy(state.date)}, ${pad(sel.hours[0])}–${pad(sel.hours.at(-1) + 1)} – ${money(sel.total)}`;
+    $('#voucherCode').value = '';
+    $('#voucherMessage').textContent = '';
+    $('#voucherMessage').classList.remove('error');
+    voucherQuote = null;
+    renderBookingTotals(sel.total);
     $('#bookError').textContent = sel.contiguous ? '' : 'Vui lòng chọn các giờ liền nhau.';
     $('#bookGo').disabled = !sel.contiguous; $('#bookDlg').showModal();
+  };
+  $('#voucherCode').addEventListener('input', () => {
+    voucherQuote = null;
+    $('#voucherMessage').textContent = '';
+    $('#voucherMessage').classList.remove('error');
+    const sel = currentSelection();
+    if (sel) renderBookingTotals(sel.total);
+  });
+  $('#applyVoucher').onclick = async () => {
+    const sel = currentSelection();
+    if (!sel) return;
+    const button = $('#applyVoucher');
+    button.disabled = true;
+    $('#voucherMessage').textContent = '';
+    $('#voucherMessage').classList.remove('error');
+    try {
+      const { quote } = await api('voucher-quote', { method: 'POST', body: {
+        pitch_id: sel.p.id, date: state.date, hours: sel.hours, voucher_code: $('#voucherCode').value
+      } });
+      voucherQuote = quote;
+      $('#voucherCode').value = quote.code;
+      $('#voucherMessage').textContent = `Đã áp dụng mã ${quote.code}.`;
+      renderBookingTotals(quote.subtotal, quote.discount, quote.total);
+    } catch (error) {
+      voucherQuote = null;
+      $('#voucherMessage').textContent = error.message;
+      $('#voucherMessage').classList.add('error');
+    } finally { button.disabled = false; }
   };
   $('#bookBack').onclick = () => $('#bookDlg').close();
   $('#bookGo').onclick = async () => {
     const sel = currentSelection(); if (!sel) return;
+    if ($('#voucherCode').value.trim() && !voucherQuote) {
+      $('#bookError').textContent = 'Hãy áp dụng mã giảm giá hoặc xóa mã trước khi xác nhận.';
+      return;
+    }
     $('#bookGo').disabled = true; $('#bookError').textContent = '';
     try {
-      const r = await api('book', { method: 'POST', body: { pitch_id: sel.p.id, date: state.date, hours: sel.hours } });
+      const r = await api('book', { method: 'POST', body: {
+        pitch_id: sel.p.id, date: state.date, hours: sel.hours,
+        voucher_code: voucherQuote?.code || ''
+      } });
       $('#bookDlg').close(); clearSelection();
-      flash(`Đặt sân thành công. Mã đặt sân: ${r.booking.code}`);
+      flash(r.booking.discount
+        ? `Đặt sân thành công, đã giảm ${money(r.booking.discount)}. Mã đặt sân: ${r.booking.code}`
+        : `Đặt sân thành công. Mã đặt sân: ${r.booking.code}`);
       loadSlots(); loadMine();
     } catch (e) {
       $('#bookError').textContent = e.message;
@@ -512,8 +615,15 @@
     renderBookingStats();
     document.querySelectorAll('[data-booking-filter]').forEach(b =>
       b.setAttribute('aria-pressed', String(b.dataset.bookingFilter === bookingFilter)));
-    const filtered = bookingFilter === 'all' ? myBookings
+    const fromDate = $('#bookingFromDate').value;
+    const toDate = $('#bookingToDate').value;
+    if (fromDate && toDate && fromDate > toDate) {
+      $('#myBookings').innerHTML = '<p class="error">Ngày bắt đầu không thể sau ngày kết thúc.</p>';
+      return;
+    }
+    const byStatus = bookingFilter === 'all' ? myBookings
       : myBookings.filter(b => (groupedStatuses[bookingFilter] || [bookingFilter]).includes(b.status));
+    const filtered = byStatus.filter(b => (!fromDate || b.date >= fromDate) && (!toDate || b.date <= toDate));
     const box = $('#myBookings');
     box.innerHTML = '';
     if (!filtered.length) {
@@ -531,6 +641,12 @@
       renderBookingList();
     }
   });
+  ['bookingFromDate', 'bookingToDate'].forEach(id => $('#' + id).addEventListener('change', renderBookingList));
+  $('#clearBookingDates').onclick = () => {
+    $('#bookingFromDate').value = '';
+    $('#bookingToDate').value = '';
+    renderBookingList();
+  };
   async function loadMine() {
     const box = $('#myBookings');
     box.innerHTML = '<p class="history-loading" role="status">Đang tải lịch đặt...</p>';
@@ -562,6 +678,7 @@
         <div><span>Thời lượng</span><b>${b.to - b.from} giờ</b></div>
         <div><span>Tổng tiền</span><b class="booking-total">${money(b.total)}</b></div>
       </div>
+      ${Number(b.discount) > 0 ? `<p class="booking-discount">Mã ${esc(b.voucher_code || '')} · Giảm ${money(b.discount)} trên ${money(b.subtotal)}</p>` : ''}
       <div class="booking-meta"><span>Mã đặt sân <b>${esc(b.code)}</b></span><span>Đặt lúc ${dateTime(b.created_at)}</span></div>
       <div class="booking-status-note"><b>${esc(descriptions[b.status] || '')}</b>
         ${b.status === 'pending' ? `<span>Hạn thanh toán: ${dateTime(b.expires_at)}</span>` : ''}
@@ -581,10 +698,10 @@
     if (b.status === 'cancel_fee_pending') actions.appendChild(button('Thanh toán phí hủy', async () => {
       try { showPay((await api('cancel-fee-pay?id=' + b.id)).pay, true); } catch (e) { alert(e.message); loadMine(); }
     }));
-    const matchAlreadyPosted = myMatches.some(match => Number(match.booking_id) === Number(b.id));
+    const postedMatch = myMatches.find(match => Number(match.booking_id) === Number(b.id) && match.status !== 'cancelled');
     if (['confirmed', 'paid'].includes(b.status) && new Date(`${b.date}T${pad(b.to)}:00`).getTime() > Date.now()) {
-      actions.appendChild(button(matchAlreadyPosted ? 'Đã đăng tìm đối thủ' : 'Tìm đối thủ', () => openCreateMatch(b), true));
-      actions.lastChild.disabled = matchAlreadyPosted;
+      actions.appendChild(button(postedMatch ? 'Đã đăng tìm đối thủ' : 'Tìm đối thủ', () => openCreateMatch(b), true));
+      actions.lastChild.disabled = !!postedMatch;
     }
     if (b.can_cancel) actions.appendChild(button('Hủy lịch', () => openCancel(b), true));
     return row;
@@ -622,6 +739,11 @@
 
   $('#closeCreateMatch').onclick = () => $('#createMatchDlg').close();
   $('#closeRequestMatch').onclick = () => $('#requestMatchDlg').close();
+  $('#matchGuestEnabled').addEventListener('change', () => {
+    const enabled = $('#matchGuestEnabled').checked;
+    $('#matchPlayersNeeded').disabled = !enabled;
+    $('#matchPlayersNeededField').hidden = !enabled;
+  });
   $('#createMatchForm').onsubmit = async e => {
     e.preventDefault();
     const submit = e.target.querySelector('button[type="submit"]');
@@ -632,7 +754,7 @@
         booking_id: Number($('#matchBookingId').value),
         team_name: $('#matchTeamName').value,
         contact_phone: $('#matchPhone').value,
-        players_needed: Number($('#matchPlayersNeeded').value),
+        players_needed: $('#matchGuestEnabled').checked ? Number($('#matchPlayersNeeded').value) : 0,
         description: $('#matchDescription').value
       } });
       $('#createMatchDlg').close();
@@ -708,6 +830,15 @@
       if (match) openGuestPlayer(match);
       return;
     }
+    const reopenMatch = e.target.closest('[data-reopen-match]');
+    if (reopenMatch) {
+      const match = myMatches.find(item => Number(item.booking_id) === Number(reopenMatch.dataset.reopenMatch));
+      if (match) openCreateMatch({
+        id: match.booking_id, venue: match.venue_name, pitch: match.pitch, date: match.date,
+        from: match.start_hour, to: match.end_hour
+      });
+      return;
+    }
     const capacityButton = e.target.closest('[data-save-player-capacity]');
     if (capacityButton) {
       const challengeId = Number(capacityButton.dataset.savePlayerCapacity);
@@ -766,8 +897,8 @@
     option.value = String(hour); option.textContent = `${pad(hour)}–${pad(hour + 1)}`;
     $('#hourFilter').appendChild(option);
   }
-  ['pitchSearch', 'areaSearch', 'hourFilter', 'typeFilter'].forEach(id => {
-    $('#' + id).addEventListener(id === 'hourFilter' || id === 'typeFilter' ? 'change' : 'input', () => {
+  ['pitchSearch', 'areaSearch', 'minPriceFilter', 'maxPriceFilter', 'hourFilter', 'typeFilter', 'distanceFilter'].forEach(id => {
+    $('#' + id).addEventListener(['hourFilter', 'typeFilter', 'distanceFilter'].includes(id) ? 'change' : 'input', () => {
       clearSelection(); renderVenues();
     });
   });
@@ -788,6 +919,10 @@
     } catch (error) { flash(error.message, 'err'); button.disabled = false; }
   });
   renderDays();
+  const maxBookingDate = new Date();
+  maxBookingDate.setDate(maxBookingDate.getDate() + 13);
+  $('#bookingDate').min = ymd(new Date());
+  $('#bookingDate').max = ymd(maxBookingDate);
   loadTopRated();
   loadMatches();
   selectDate(ymd(new Date()));

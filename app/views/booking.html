@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/style.css"><title>Đặt sân</title></head><body>
+<link rel="stylesheet" href="assets/css/style.css?v=united-pinned-logo"><title>Đặt sân</title></head><body>
 <header class="top slim"><div class="wrap navrow"><h1>Bóng đá quanh ta</h1>
   <div class="who">
     <a class="btn ghost light" id="loginNavBtn" href="login">Đăng nhập</a>
@@ -26,12 +26,18 @@
 </section>
 <section aria-labelledby="h-calendar"><h2 id="h-calendar">Lịch sân</h2>
   <div id="days" class="days calendar-days" role="group" aria-label="Chọn ngày đặt sân"></div>
+  <label class="date-picker-label">Hoặc chọn ngày cụ thể<input id="bookingDate" type="date"></label>
   <p id="availabilitySummary" class="availability-summary" aria-live="polite"></p>
 </section>
 <section aria-labelledby="h-slot"><h2 id="h-slot">Chọn cụm sân</h2>
   <div class="search-filters panel">
     <label>Tìm sân<input id="pitchSearch" type="search" placeholder="Tên sân hoặc cụm sân"></label>
     <label>Khu vực<input id="areaSearch" type="search" placeholder="Nhập quận, huyện hoặc địa chỉ"></label>
+    <div class="location-filter"><button class="btn ghost sm" id="useCurrentLocation" type="button">Dùng vị trí hiện tại</button>
+      <label>Bán kính<select id="distanceFilter"><option value="5">5 km</option><option value="10" selected>10 km</option><option value="20">20 km</option><option value="50">50 km</option></select></label>
+      <small id="locationStatus" class="hint" role="status">Chưa bật lọc khoảng cách.</small></div>
+    <label>Giá/giờ từ<input id="minPriceFilter" type="number" min="0" step="10000" inputmode="numeric" placeholder="Không giới hạn"></label>
+    <label>Đến<input id="maxPriceFilter" type="number" min="0" step="10000" inputmode="numeric" placeholder="Không giới hạn"></label>
     <label>Loại sân<select id="typeFilter"><option value="">Tất cả loại sân</option><option value="Sân 5 người">Sân 5 người</option><option value="Sân 7 người">Sân 7 người</option><option value="Sân 11 người">Sân 11 người</option></select></label>
     <label>Giờ còn trống<select id="hourFilter"><option value="">Tất cả khung giờ</option></select></label>
   </div>
@@ -64,6 +70,11 @@
     <button class="chip" type="button" data-booking-filter="cancelled" aria-pressed="false">Đã hủy</button>
     <button class="chip" type="button" data-booking-filter="expired" aria-pressed="false">Hết hạn</button>
   </div>
+  <div class="booking-date-filters" role="group" aria-label="Lọc lịch đặt theo ngày đá">
+    <label>Từ ngày<input id="bookingFromDate" type="date"></label>
+    <label>Đến ngày<input id="bookingToDate" type="date"></label>
+    <button class="btn ghost sm" id="clearBookingDates" type="button">Xóa ngày lọc</button>
+  </div>
   <div id="myBookings" aria-live="polite"></div>
 </section>
 </main>
@@ -74,6 +85,11 @@
 </div>
 
 <dialog id="bookDlg"><h3>Xác nhận đặt sân</h3><p id="summary" class="summary"></p>
+  <div class="voucher-entry"><label for="voucherCode">Mã giảm giá</label>
+    <div><input id="voucherCode" maxlength="32" autocomplete="off" placeholder="Nhập mã giảm giá">
+      <button class="btn ghost sm" id="applyVoucher" type="button">Áp dụng</button></div>
+    <p id="voucherMessage" class="hint" role="status"></p><p id="bookingTotals" class="summary"></p>
+  </div>
   <p class="hint">Đặt sân không cần thanh toán trước. Bạn thanh toán trực tiếp tại sân theo thông tin của chủ sân.</p>
   <p id="bookError" class="error" role="alert"></p>
   <div class="actions"><button class="btn ghost" id="bookBack">Quay lại</button><button class="btn" id="bookGo">Xác nhận đặt sân</button></div></dialog>
@@ -100,7 +116,8 @@
     <input id="matchBookingId" name="booking_id" type="hidden">
     <label>Tên đội<input id="matchTeamName" name="team_name" required minlength="2" maxlength="80"></label>
     <label>Số điện thoại liên hệ<input id="matchPhone" name="contact_phone" type="tel" required pattern="(0|\+84)\d{9}"></label>
-    <label>Số người đá vãng lai cần thêm<input id="matchPlayersNeeded" name="players_needed" type="number" min="1" max="30" value="1" required></label>
+    <label class="inline-choice"><input id="matchGuestEnabled" type="checkbox"> Cho phép người chơi vãng lai đăng ký</label>
+    <label id="matchPlayersNeededField" hidden>Số người chơi vãng lai cần thêm<input id="matchPlayersNeeded" name="players_needed" type="number" min="1" max="30" value="1" disabled></label>
     <label>Lời giới thiệu<textarea id="matchDescription" name="description" rows="3" maxlength="500" placeholder="Trình độ, số người, mong muốn khi giao hữu..."></textarea></label>
     <p class="hint">Tên đội và số điện thoại sẽ hiển thị công khai. Đội bạn sẽ duyệt từng người xin đá vãng lai.</p>
     <p id="createMatchError" class="error" role="alert"></p>
@@ -137,6 +154,7 @@
   <div class="profile-dialog-head"><div><p class="eyebrow">TÀI KHOẢN CỦA BẠN</p><h3>Thông tin cá nhân</h3></div>
     <button class="dialog-close" id="profileCloseIcon" type="button" aria-label="Đóng">×</button></div>
   <form id="profileForm" class="profile-form">
+    <input type="hidden" name="profile_version">
     <div class="profile-fields">
       <label>Họ và tên<input id="profileName" name="name" required minlength="2" maxlength="60" autocomplete="name"></label>
       <label>Email<input id="profileEmail" name="email" type="email" required maxlength="120" autocomplete="email"></label>
@@ -159,4 +177,5 @@
   </form>
 </dialog>
 <script src="assets/js/app.js"></script><script src="assets/js/booking.js"></script>
+<footer class="site-footer" aria-label="Manchester United"></footer>
 </body></html>

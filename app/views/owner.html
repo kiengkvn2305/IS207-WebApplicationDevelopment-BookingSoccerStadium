@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/style.css"><title>Chủ sân</title></head><body>
+<link rel="stylesheet" href="assets/css/style.css?v=united-pinned-logo"><title>Chủ sân</title></head><body>
 <header class="top slim"><div class="wrap navrow"><h1>Bóng đá quanh ta</h1>
   <div class="who"><div class="account-menu" id="accountMenu" hidden>
     <button class="btn ghost light account-trigger" id="accountBtn" type="button" aria-haspopup="true" aria-expanded="false">
@@ -22,8 +22,13 @@
 <section><h2>Tài khoản nhận phí hủy</h2>
   <p id="noBank" class="flash err" hidden>Bạn chưa nhập tài khoản ngân hàng nên sân chưa hiển thị cho khách đặt.</p>
   <form id="bankForm" class="panel grid2">
+    <input type="hidden" name="profile_version">
     <label>Tên cụm sân<input name="venue_name" required maxlength="100"></label>
     <label>Địa chỉ<input name="address" maxlength="200"></label>
+    <label>Vĩ độ<input name="latitude" id="venueLatitude" type="number" min="-90" max="90" step="any" placeholder="Ví dụ: 10.762622"></label>
+    <label>Kinh độ<input name="longitude" id="venueLongitude" type="number" min="-180" max="180" step="any" placeholder="Ví dụ: 106.660172"></label>
+    <div><button class="btn ghost sm" id="ownerUseLocation" type="button">Lấy tọa độ hiện tại</button>
+      <small id="ownerLocationStatus" class="hint" role="status">Cần tọa độ để khách lọc theo khoảng cách.</small></div>
     <label>Ngân hàng<select name="bank_bin" id="bankSel" required><option value="">— Chọn —</option></select></label>
     <label>Số tài khoản<input name="account_no" required inputmode="numeric" pattern="\d{6,19}"></label>
     <label>Tên chủ tài khoản (HOA, không dấu)<input name="account_name" required pattern="[A-Za-z ]{3,60}"></label>
@@ -39,7 +44,7 @@
     <input id="venueImageFile" type="file" accept="image/jpeg,image/png,image/webp">
   </label>
   <form id="amenityForm" class="panel">
-    <fieldset><legend>Tiện ích hiện có</legend><div id="amenityChoices" class="amenity-choices"></div></fieldset>
+    <label>Tiện ích (mỗi dòng một mục)<textarea id="amenityText" name="amenities" rows="4" maxlength="1600" placeholder="Bãi đỗ xe&#10;Phòng thay đồ&#10;Cho thuê áo bib"></textarea></label>
     <div class="end"><button class="btn">Lưu tiện ích</button></div>
   </form>
 </section>
@@ -54,7 +59,7 @@
   </form>
 </section>
 <section><h2>Quản lý khung giờ</h2>
-  <p class="hint">Chọn ngày và sân, sau đó bấm giờ còn trống để gỡ giờ đó khỏi lịch khách đặt. Giờ đã có người đặt không thể gỡ.</p>
+  <p class="hint">Chọn ngày và sân, sau đó khóa khung giờ trống kèm lý do. Giờ đã có người đặt không thể khóa.</p>
   <div class="panel grid2 slot-manager">
     <label>Sân<select id="schedulePitch"></select></label>
     <label>Ngày<input id="scheduleDate" type="date"></label>
@@ -65,10 +70,19 @@
   <div class="tablewrap"><table><thead><tr><th>Mã</th><th>Khách</th><th>Sân</th><th>Ngày giờ</th><th>Tiền</th><th>Trạng thái</th><th></th></tr></thead><tbody id="bookingRows"></tbody></table></div>
 </section>
 </main>
+<dialog id="blockSlotDlg" class="profile-dialog">
+  <h3>Khóa khung giờ</h3>
+  <p id="blockSlotInfo" class="summary"></p>
+  <label>Lý do khóa sân<textarea id="blockSlotReason" rows="3" maxlength="255" required placeholder="Ví dụ: bảo trì mặt cỏ"></textarea></label>
+  <p id="blockSlotError" class="error" role="alert"></p>
+  <div class="actions"><button class="btn ghost" id="blockSlotCancel" type="button">Hủy</button>
+    <button class="btn" id="blockSlotConfirm" type="button">Xác nhận khóa</button></div>
+</dialog>
 <dialog id="profileDlg" class="profile-dialog">
   <div class="profile-dialog-head"><div><p class="eyebrow">TÀI KHOẢN CỦA BẠN</p><h3>Thông tin cá nhân</h3></div>
     <button class="dialog-close" id="profileCloseIcon" type="button" aria-label="Đóng">×</button></div>
   <form id="profileForm" class="profile-form">
+    <input type="hidden" name="profile_version">
     <div class="profile-fields">
       <label>Họ và tên<input id="profileName" name="name" required minlength="2" maxlength="60" autocomplete="name"></label>
       <label>Email<input id="profileEmail" name="email" type="email" required maxlength="120" autocomplete="email"></label>
@@ -91,4 +105,5 @@
   </form>
 </dialog>
 <script src="assets/js/app.js"></script><script src="assets/js/owner.js"></script>
+<footer class="site-footer" aria-label="Manchester United"></footer>
 </body></html>

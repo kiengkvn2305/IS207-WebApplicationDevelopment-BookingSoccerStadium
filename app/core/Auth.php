@@ -30,7 +30,11 @@ class Auth {
         return self::$cache = $u;
     }
     static function login(int $id): void {
-        session_regenerate_id(true); $_SESSION['uid'] = $id; self::$cache = false;
+        session_regenerate_id(true);
+        $_SESSION = ['uid' => $id, 'csrf' => bin2hex(random_bytes(32))];
+        self::$cache = false;
     }
-    static function logout(): void { $_SESSION = []; session_destroy(); self::$cache = null; }
+    static function logout(): void {
+        $_SESSION = []; session_destroy(); self::$cache = null;
+    }
 }

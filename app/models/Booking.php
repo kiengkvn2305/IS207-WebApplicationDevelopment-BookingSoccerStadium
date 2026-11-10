@@ -1,16 +1,17 @@
 <?php
 class Booking {
-    const SEL = "SELECT b.*, p.name pitch, p.type pitch_type, o.venue_name venue,
+    const SEL = "SELECT b.*, v.code voucher_code, p.name pitch, p.type pitch_type, o.venue_name venue,
         o.address venue_address, owner.name owner_name, owner.phone owner_phone,
         TIMESTAMPDIFF(SECOND,NOW(),b.expires_at) left_s,
         TIMESTAMPDIFF(MINUTE,NOW(),TIMESTAMP(b.date,MAKETIME(b.start_hour,0,0))) mins_to_start,
         TIMESTAMPDIFF(SECOND,NOW(),TIMESTAMP(b.date,MAKETIME(b.start_hour,0,0))) seconds_to_start
         FROM bookings b JOIN pitches p ON p.id=b.pitch_id
-        JOIN users owner ON owner.id=p.owner_id LEFT JOIN owner_profiles o ON o.user_id=owner.id ";
+        JOIN users owner ON owner.id=p.owner_id LEFT JOIN owner_profiles o ON o.user_id=owner.id
+        LEFT JOIN vouchers v ON v.id=b.voucher_id ";
 
     // Nhả sân với các đơn chờ thanh toán đã quá hạn
     static function expireHolds(): void {
-        $pdo = Database::pdo(); $pdo->beginTransaction();
+        $pdo = Database::pdo(); Database::beginTransaction();
         try {
             $expired = $pdo->query("SELECT b.id,b.user_id,p.owner_id,b.code,b.date,b.start_hour,b.end_hour,p.name pitch,o.venue_name
                 FROM bookings b JOIN pitches p ON p.id=b.pitch_id
@@ -31,9 +32,9 @@ class Booking {
                         'Một đơn chờ thanh toán đã hết hạn; khung giờ được mở lại. ' . $details, 'chu-san');
                 }
             }
-            $pdo->commit();
+            Database::commit();
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ($pdo->inTransaction()) Database::rollBack();
             throw $e;
         }
     }
@@ -45,27 +46,47 @@ class Booking {
     static function pendingCount(int $uid): int {
         return (int)Database::q("SELECT COUNT(*) FROM bookings WHERE user_id=? AND status='pending'", [$uid])->fetchColumn();
     }
-    // Trả về id đơn, hoặc 0 nếu có giờ vừa bị người khác đặt
-    static function create(int $uid, array $pitch, string $date, array $hours): int {
+    // Returns the booking id, applied discount, or an error when the voucher is no longer usable.
+    static function create(int $uid, array $pitch, string $date, array $hours, string $voucherCode = ''): array {
         $pdo = Database::pdo(); $code = strtoupper(bin2hex(random_bytes(4)));
         $total = array_sum(array_map(fn($h) => Pitch::price($pitch, $h), $hours));
-        $pdo->beginTransaction();
+        Database::beginTransaction();
         try {
             Database::q("SELECT id FROM pitches WHERE id=? FOR UPDATE", [$pitch['id']])->fetch();
+            $voucher = null;
+            $discount = 0;
+            if ($voucherCode !== '') {
+                $voucher = Voucher::quote($voucherCode, $total, true);
+                if (isset($voucher['error'])) {
+                    Database::rollBack();
+                    return ['id' => 0, 'error' => $voucher['error']];
+                }
+                $discount = $voucher['discount'];
+            }
             foreach ($hours as $h) {
                 if (Database::q("SELECT 1 FROM unavailable_slots WHERE pitch_id=? AND date=? AND hour=?", [$pitch['id'], $date, $h])->fetchColumn()) {
-                    $pdo->rollBack(); return 0;
+                    Database::rollBack(); return ['id' => 0, 'error' => null];
                 }
             }
-            Database::q("INSERT INTO bookings(code,user_id,pitch_id,date,start_hour,end_hour,total,status,expires_at)
-                VALUES(?,?,?,?,?,?,?,'confirmed',TIMESTAMP(?,MAKETIME(?,0,0)))",
-                [$code, $uid, $pitch['id'], $date, $hours[0], end($hours) + 1, $total, $date, end($hours) + 1]);
+            Database::q("INSERT INTO bookings(code,user_id,pitch_id,date,start_hour,end_hour,total,subtotal,discount,voucher_id,status,expires_at)
+                VALUES(?,?,?,?,?,?,?,?,?,?,'confirmed',TIMESTAMP(?,MAKETIME(?,0,0)))",
+                [$code, $uid, $pitch['id'], $date, $hours[0], end($hours) + 1, $total - $discount, $total,
+                    $discount, $voucher['id'] ?? null, $date, end($hours) + 1]);
             $id = (int)$pdo->lastInsertId();
             foreach ($hours as $h) Database::q("INSERT INTO booking_slots(booking_id,pitch_id,date,hour) VALUES(?,?,?,?)", [$id, $pitch['id'], $date, $h]);
-            $pdo->commit(); return $id;
+            if ($voucher) {
+                Database::q("UPDATE vouchers SET usage_count=usage_count+1 WHERE id=?", [$voucher['id']]);
+                Database::q("INSERT INTO voucher_redemptions(voucher_id,booking_id,user_id,discount) VALUES(?,?,?,?)",
+                    [$voucher['id'], $id, $uid, $discount]);
+            }
+            Database::commit();
+            return ['id' => $id, 'error' => null, 'subtotal' => $total, 'discount' => $discount, 'total' => $total - $discount];
         } catch (PDOException $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
-            if ((int)($e->errorInfo[1] ?? 0) === 1062) return 0;
+            if ($pdo->inTransaction()) Database::rollBack();
+            if ((int)($e->errorInfo[1] ?? 0) === 1062) return ['id' => 0, 'error' => null];
+            throw $e;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) Database::rollBack();
             throw $e;
         }
     }
@@ -115,32 +136,38 @@ class Booking {
     }
     // Trả về đơn đã hủy hoặc null nếu token sai/hết hạn/không còn hủy được
     static function confirmCancel(int $bid, int $uid, string $token): ?array {
-        $pdo = Database::pdo(); $pdo->beginTransaction();
-        $lockedBooking = Database::q("SELECT id FROM bookings WHERE id=? AND user_id=? FOR UPDATE", [$bid, $uid])->fetchColumn();
-        $rid = Database::q("SELECT id FROM cancel_requests WHERE booking_id=? AND user_id=? AND token_hash=? AND used_at IS NULL AND expires_at>NOW() FOR UPDATE",
-            [$bid, $uid, hash('sha256', $token)])->fetchColumn();
-        $b = self::mine($bid, $uid);
-        if (!$lockedBooking || !$rid || !$b || !self::canCancel($b)) { $pdo->rollBack(); return null; }
-        Database::q("UPDATE cancel_requests SET used_at=NOW() WHERE id=?", [$rid]);
-        $withinFeeWindow = $b['status'] === 'confirmed' && (int)$b['seconds_to_start'] <= CANCEL_BEFORE_HOURS * 3600;
-        if ($withinFeeWindow) {
-            $fee = intdiv((int)$b['total'] * 70 + 50, 100);
-            Database::q("UPDATE bookings SET status='cancel_fee_pending',cancellation_fee=?,cancel_requested_at=NOW() WHERE id=?",
-                [$fee, $bid]);
-            $b['status'] = 'cancel_fee_pending';
-            $b['cancellation_fee'] = $fee;
-            $pdo->commit();
+        $pdo = Database::pdo(); Database::beginTransaction();
+        try {
+            $lockedBooking = Database::q("SELECT id FROM bookings WHERE id=? AND user_id=? FOR UPDATE", [$bid, $uid])->fetchColumn();
+            $rid = Database::q("SELECT id FROM cancel_requests WHERE booking_id=? AND user_id=? AND token_hash=? AND used_at IS NULL AND expires_at>NOW() FOR UPDATE",
+                [$bid, $uid, hash('sha256', $token)])->fetchColumn();
+            $b = self::mine($bid, $uid);
+            if (!$lockedBooking || !$rid || !$b || !self::canCancel($b)) { Database::rollBack(); return null; }
+            Database::q("UPDATE cancel_requests SET used_at=NOW() WHERE id=?", [$rid]);
+            $withinFeeWindow = $b['status'] === 'confirmed' && (int)$b['seconds_to_start'] <= CANCEL_BEFORE_HOURS * 3600;
+            if ($withinFeeWindow) {
+                $fee = (int)Database::q("SELECT sannha_cancel_fee(?)", [(int)$b['total']])->fetchColumn();
+                Database::q("UPDATE bookings SET status='cancel_fee_pending',cancellation_fee=?,cancel_requested_at=NOW() WHERE id=?",
+                    [$fee, $bid]);
+                $b['status'] = 'cancel_fee_pending';
+                $b['cancellation_fee'] = $fee;
+                Database::commit();
+                return $b;
+            }
+            $refundAmount = $b['status'] === 'paid' ? (int)$b['total'] : 0;
+            Database::q("UPDATE bookings SET status='cancelled', cancelled_at=NOW(),cancelled_by='customer',
+                refund_status=?,refund_amount=? WHERE id=?",
+                [$refundAmount > 0 ? 'pending' : 'none', $refundAmount, $bid]);
+            self::releaseBookingSlotsAndCloseMatches($bid);
+            $b['refund_status'] = $refundAmount > 0 ? 'pending' : 'none';
+            $b['refund_amount'] = $refundAmount;
+            $b['status'] = 'cancelled';
+            Database::commit();
             return $b;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) Database::rollBack();
+            throw $e;
         }
-        $refundAmount = $b['status'] === 'paid' ? (int)$b['total'] : 0;
-        Database::q("UPDATE bookings SET status='cancelled', cancelled_at=NOW(),cancelled_by='customer',
-            refund_status=?,refund_amount=? WHERE id=?",
-            [$refundAmount > 0 ? 'pending' : 'none', $refundAmount, $bid]);
-        self::releaseBookingSlotsAndCloseMatches($bid);
-        $b['refund_status'] = $refundAmount > 0 ? 'pending' : 'none';
-        $b['refund_amount'] = $refundAmount;
-        $b['status'] = 'cancelled';
-        $pdo->commit(); return $b;
     }
 
     private static function releaseBookingSlotsAndCloseMatches(int $bookingId): void {
@@ -152,16 +179,17 @@ class Booking {
 
     // ---- Chủ sân ----
     static function listByOwner(int $owner): array {
-        return Database::q("SELECT b.id,b.code,b.date,b.start_hour,b.end_hour,b.total,b.status,b.refund_status,b.refund_amount,
+        return Database::q("SELECT b.id,b.code,b.date,b.start_hour,b.end_hour,b.total,b.subtotal,b.discount,v.code voucher_code,b.status,b.refund_status,b.refund_amount,
             b.cancellation_fee,b.cancelled_by,
             TIMESTAMPDIFF(SECOND,NOW(),TIMESTAMP(b.date,MAKETIME(b.start_hour,0,0))) owner_seconds_to_start,
             (b.expires_at>NOW()) live,
             p.name pitch, c.name cname, c.phone cphone FROM bookings b JOIN pitches p ON p.id=b.pitch_id JOIN users c ON c.id=b.user_id
+            LEFT JOIN vouchers v ON v.id=b.voucher_id
             WHERE p.owner_id=? ORDER BY b.id DESC LIMIT 50", [$owner])->fetchAll();
     }
     static function cancelByOwner(int $id, int $owner): ?array {
         $pdo = Database::pdo();
-        $pdo->beginTransaction();
+        Database::beginTransaction();
         try {
             $b = Database::q("SELECT b.id,b.user_id,b.status,b.total,b.cancellation_fee,b.refund_status,
                 TIMESTAMPDIFF(SECOND,NOW(),TIMESTAMP(b.date,MAKETIME(b.start_hour,0,0))) seconds_to_start
@@ -169,38 +197,45 @@ class Booking {
                 WHERE b.id=? AND p.owner_id=? FOR UPDATE", [$id, $owner])->fetch();
             if (!$b || !in_array($b['status'], ['confirmed','pending','paid','cancel_fee_pending'], true)
                 || (int)$b['seconds_to_start'] <= 0) {
-                $pdo->rollBack();
+                Database::rollBack();
                 return null;
             }
             $refundAmount = $b['status'] === 'paid' ? (int)$b['total'] : 0;
             Database::q("UPDATE bookings SET status='cancelled',cancelled_at=NOW(),cancelled_by='owner',
                 refund_status=?,refund_amount=? WHERE id=?", [$refundAmount ? 'pending' : 'none', $refundAmount, $id]);
             self::releaseBookingSlotsAndCloseMatches($id);
-            $pdo->commit();
+            Database::commit();
             return ['user_id' => (int)$b['user_id'], 'refund_amount' => $refundAmount];
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ($pdo->inTransaction()) Database::rollBack();
             throw $e;
         }
     }
     static function confirmPaid(int $id, int $owner): bool {
-        $pdo = Database::pdo(); $pdo->beginTransaction();
-        $b = Database::q("SELECT b.id,b.total FROM bookings b JOIN pitches p ON p.id=b.pitch_id
-            WHERE b.id=? AND p.owner_id=? AND b.status='pending' AND b.expires_at>NOW() FOR UPDATE", [$id, $owner])->fetch();
-        if (!$b) { $pdo->rollBack(); return false; }
-        Database::q("UPDATE bookings SET status='paid', paid_at=NOW(), confirmed_by=? WHERE id=?", [$owner, $id]);
-        Database::q("INSERT INTO payments(booking_id,amount,confirmed_by) VALUES(?,?,?)", [$id, $b['total'], $owner]);
-        $pdo->commit(); return true;
+        $pdo = Database::pdo();
+        Database::beginTransaction();
+        try {
+            $b = Database::q("SELECT b.id,b.total FROM bookings b JOIN pitches p ON p.id=b.pitch_id
+                WHERE b.id=? AND p.owner_id=? AND b.status='pending' AND b.expires_at>NOW() FOR UPDATE", [$id, $owner])->fetch();
+            if (!$b) { Database::rollBack(); return false; }
+            Database::q("UPDATE bookings SET status='paid', paid_at=NOW(), confirmed_by=? WHERE id=?", [$owner, $id]);
+            Database::q("INSERT INTO payments(booking_id,amount,confirmed_by) VALUES(?,?,?)", [$id, $b['total'], $owner]);
+            Database::commit();
+            return true;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) Database::rollBack();
+            throw $e;
+        }
     }
     static function confirmCancellationFee(int $id, int $owner): bool {
         $pdo = Database::pdo();
-        $pdo->beginTransaction();
+        Database::beginTransaction();
         try {
             $b = Database::q("SELECT b.id,b.cancellation_fee
                 FROM bookings b JOIN pitches p ON p.id=b.pitch_id
                 WHERE b.id=? AND p.owner_id=? AND b.status='cancel_fee_pending' FOR UPDATE", [$id, $owner])->fetch();
             if (!$b) {
-                $pdo->rollBack();
+                Database::rollBack();
                 return false;
             }
             Database::q("UPDATE bookings SET status='cancelled',cancelled_at=NOW(),cancelled_by='customer',
@@ -208,25 +243,25 @@ class Booking {
             Database::q("INSERT INTO payments(booking_id,amount,confirmed_by) VALUES(?,?,?)",
                 [$id, $b['cancellation_fee'], $owner]);
             self::releaseBookingSlotsAndCloseMatches($id);
-            $pdo->commit();
+            Database::commit();
             return true;
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ($pdo->inTransaction()) Database::rollBack();
             throw $e;
         }
     }
     static function confirmFromSepay(string $transactionId, int $amount, string $type, string $date, string $content, string $referenceCode): string {
-        $pdo = Database::pdo(); $pdo->beginTransaction();
+        $pdo = Database::pdo(); Database::beginTransaction();
         try {
             $event = Database::q("INSERT IGNORE INTO sepay_webhook_events
                 (transaction_id,transfer_amount,transfer_type,transaction_date,reference_code,content,status)
                 VALUES(?,?,?,?,?,?, 'received')",
                 [$transactionId, $amount, $type, $date, mb_substr($referenceCode, 0, 100), mb_substr($content, 0, 500)]);
-            if ($event->rowCount() === 0) { $pdo->commit(); return 'duplicate'; }
+            if ($event->rowCount() === 0) { Database::commit(); return 'duplicate'; }
 
             if ($type !== 'in') {
                 Database::q("UPDATE sepay_webhook_events SET status='ignored' WHERE transaction_id=?", [$transactionId]);
-                $pdo->commit(); return 'ignored';
+                Database::commit(); return 'ignored';
             }
 
             if (preg_match('/\\bHUY\\s+SAN\\s+([A-Z0-9]{8})\\b/i', $content, $matches)) {
@@ -234,7 +269,7 @@ class Booking {
                     FROM bookings WHERE code=? FOR UPDATE", [strtoupper($matches[1])])->fetch();
                 if (!$booking) {
                     Database::q("UPDATE sepay_webhook_events SET status='unmatched' WHERE transaction_id=?", [$transactionId]);
-                    $pdo->commit(); return 'unmatched';
+                    Database::commit(); return 'unmatched';
                 }
                 if ($booking['status'] !== 'cancel_fee_pending') {
                     if ($booking['status'] === 'cancelled' && $booking['cancelled_by'] === 'owner'
@@ -244,62 +279,62 @@ class Booking {
                         Database::q("UPDATE bookings SET refund_status='pending',refund_amount=? WHERE id=?", [$amount, $booking['id']]);
                         Database::q("UPDATE sepay_webhook_events SET booking_id=?,status='paid' WHERE transaction_id=?",
                             [$booking['id'], $transactionId]);
-                        $pdo->commit(); return 'paid';
+                        Database::commit(); return 'paid';
                     }
                     Database::q("UPDATE sepay_webhook_events SET booking_id=?,status='not_pending' WHERE transaction_id=?",
                         [$booking['id'], $transactionId]);
-                    $pdo->commit(); return 'not_pending';
+                    Database::commit(); return 'not_pending';
                 }
                 if (!$booking['cancel_requested_at'] || strtotime($date) < strtotime($booking['cancel_requested_at'])) {
                     Database::q("UPDATE sepay_webhook_events SET booking_id=?,status='late' WHERE transaction_id=?",
                         [$booking['id'], $transactionId]);
-                    $pdo->commit(); return 'late';
+                    Database::commit(); return 'late';
                 }
                 if ($amount !== (int)$booking['cancellation_fee']) {
                     Database::q("UPDATE sepay_webhook_events SET booking_id=?,status='amount_mismatch' WHERE transaction_id=?",
                         [$booking['id'], $transactionId]);
-                    $pdo->commit(); return 'amount_mismatch';
+                    Database::commit(); return 'amount_mismatch';
                 }
                 $updated = Database::q("UPDATE bookings SET status='cancelled',cancelled_at=NOW(),cancelled_by='customer',
                     refund_status='none',refund_amount=0 WHERE id=? AND status='cancel_fee_pending'", [$booking['id']]);
                 if ($updated->rowCount() === 0) {
                     Database::q("UPDATE sepay_webhook_events SET booking_id=?,status='late' WHERE transaction_id=?",
                         [$booking['id'], $transactionId]);
-                    $pdo->commit(); return 'late';
+                    Database::commit(); return 'late';
                 }
                 Database::q("INSERT INTO payments(booking_id,amount,confirmed_by) VALUES(?,?,NULL)", [$booking['id'], $amount]);
                 self::releaseBookingSlotsAndCloseMatches((int)$booking['id']);
                 Database::q("UPDATE sepay_webhook_events SET booking_id=?,status='paid' WHERE transaction_id=?",
                     [$booking['id'], $transactionId]);
-                $pdo->commit(); return 'paid';
+                Database::commit(); return 'paid';
             }
 
             if (!preg_match('/\\bSAN\\s+([A-Z0-9]{8})\\b/i', $content, $matches)) {
                 Database::q("UPDATE sepay_webhook_events SET status='ignored' WHERE transaction_id=?", [$transactionId]);
-                $pdo->commit(); return 'ignored';
+                Database::commit(); return 'ignored';
             }
 
             $booking = Database::q("SELECT id,total,status,expires_at FROM bookings WHERE code=? FOR UPDATE",
                 [strtoupper($matches[1])])->fetch();
             if (!$booking) {
                 Database::q("UPDATE sepay_webhook_events SET status='unmatched' WHERE transaction_id=?", [$transactionId]);
-                $pdo->commit(); return 'unmatched';
+                Database::commit(); return 'unmatched';
             }
             if ($booking['status'] !== 'pending') {
                 $status = $booking['status'] === 'paid' ? 'already_paid' : 'not_pending';
                 Database::q("UPDATE sepay_webhook_events SET booking_id=?,status=? WHERE transaction_id=?",
                     [$booking['id'], $status, $transactionId]);
-                $pdo->commit(); return $status;
+                Database::commit(); return $status;
             }
             if ($amount !== (int)$booking['total']) {
                 Database::q("UPDATE sepay_webhook_events SET booking_id=?,status='amount_mismatch' WHERE transaction_id=?",
                     [$booking['id'], $transactionId]);
-                $pdo->commit(); return 'amount_mismatch';
+                Database::commit(); return 'amount_mismatch';
             }
             if (strtotime($booking['expires_at']) <= time() || strtotime($date) > strtotime($booking['expires_at'])) {
                 Database::q("UPDATE sepay_webhook_events SET booking_id=?,status='late' WHERE transaction_id=?",
                     [$booking['id'], $transactionId]);
-                $pdo->commit(); return 'late';
+                Database::commit(); return 'late';
             }
 
             $updated = Database::q("UPDATE bookings SET status='paid',paid_at=NOW(),confirmed_by=NULL
@@ -307,15 +342,15 @@ class Booking {
             if ($updated->rowCount() === 0) {
                 Database::q("UPDATE sepay_webhook_events SET booking_id=?,status='late' WHERE transaction_id=?",
                     [$booking['id'], $transactionId]);
-                $pdo->commit(); return 'late';
+                Database::commit(); return 'late';
             }
             Database::q("INSERT INTO payments(booking_id,amount,confirmed_by) VALUES(?,?,NULL)",
                 [$booking['id'], $amount]);
             Database::q("UPDATE sepay_webhook_events SET booking_id=?,status='paid' WHERE transaction_id=?",
                 [$booking['id'], $transactionId]);
-            $pdo->commit(); return 'paid';
+            Database::commit(); return 'paid';
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ($pdo->inTransaction()) Database::rollBack();
             throw $e;
         }
     }
@@ -326,7 +361,8 @@ class Booking {
 
     // ---- Admin ----
     static function recentAll(): array {
-        return Database::q("SELECT b.code,b.date,b.start_hour,b.total,b.status,p.name pitch,c.name cname,w.name wname FROM bookings b
+        return Database::q("SELECT b.code,b.date,b.start_hour,b.total,b.subtotal,b.discount,v.code voucher_code,b.status,p.name pitch,c.name cname,w.name wname FROM bookings b
+            LEFT JOIN vouchers v ON v.id=b.voucher_id
             JOIN pitches p ON p.id=b.pitch_id JOIN users c ON c.id=b.user_id JOIN users w ON w.id=p.owner_id ORDER BY b.id DESC LIMIT 30")->fetchAll();
     }
 }

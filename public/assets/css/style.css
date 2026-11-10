@@ -809,3 +809,151 @@ body::before{content:"⚽";position:fixed;z-index:-1;right:-34px;bottom:9vh;font
   .booking-contact{grid-template-columns:1fr}
   .profile-fields{grid-template-columns:1fr}
 }
+.calendar-days .day{min-width:60px;padding:8px 7px}
+.date-picker-label{display:grid;grid-template-columns:auto minmax(150px,240px);align-items:center;gap:12px;margin:6px 0;font-weight:600}
+.date-picker-label input{margin:0}
+.location-filter{display:flex;align-items:end;flex-wrap:wrap;gap:8px}
+.location-filter label{display:grid;gap:4px;min-width:95px}
+.location-filter small{flex-basis:100%}
+.booking-date-filters{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin:12px 0}
+.booking-date-filters label{display:grid;gap:4px;font-weight:600}
+.booking-date-filters input{margin:0}
+.booking-discount{margin:0;color:var(--turf);font-size:13px;font-weight:600}
+.voucher-entry{margin:14px 0;padding:13px;border:1px solid var(--line);border-radius:8px;background:var(--chalk)}
+.voucher-entry>label{font-weight:600}
+.voucher-entry>div{display:flex;gap:8px;margin-top:5px}
+.voucher-entry input{flex:1;min-width:0;margin:0}
+.voucher-entry .hint{margin:6px 0}
+.voucher-entry .error{color:#a63f2b}
+.inline-choice{display:flex!important;align-items:center;gap:9px}
+.inline-choice input{width:auto;margin:0}
+:root[data-theme=dark] .voucher-entry{background:#333a35;border-color:#424d45}
+:root[data-theme=dark] .booking-discount{color:#a9c5af}
+:root[data-theme=dark] .voucher-entry .error{color:#d39a8b}
+@media(max-width:560px){
+  .date-picker-label{grid-template-columns:1fr;gap:4px}
+  .location-filter{align-items:stretch}
+}
+
+/* Manchester United match-day palette using the supplied background images. */
+:root:not([data-theme=dark]){
+  --turf:#c8102e;
+  --turf-d:#780a1a;
+  --chalk:#f7f3f2;
+  --paper:#fff;
+  --ink:#24191b;
+  --mute:#716368;
+  --line:#eadde0;
+  --card:#bd102b;
+}
+:root[data-theme=dark]{
+  --turf:#ef5268;
+  --turf-d:#8e1026;
+  --chalk:#21191b;
+  --paper:#2c2225;
+  --ink:#f0e8e9;
+  --mute:#b8a9ad;
+  --line:#49383d;
+  --card:#e14a60;
+}
+body{
+  background-color:#24191b;
+  background-image:linear-gradient(rgba(22,12,15,.58),rgba(22,12,15,.64)),url("../united-matchday-background.png");
+  background-position:center;
+  background-size:cover;
+  background-attachment:fixed;
+  padding-bottom:88px;
+}
+:root[data-theme=dark] body{
+  background-color:#21191b;
+  background-image:linear-gradient(rgba(14,8,11,.72),rgba(14,8,11,.78)),url("../united-matchday-background.png");
+  background-attachment:fixed;
+}
+:root:not([data-theme=dark]) body{
+  background-attachment:fixed;
+}
+:root:not([data-theme=dark]) .top{
+  background-color:#8f0d23;
+  background-image:linear-gradient(112deg,rgba(200,16,46,.97),rgba(116,8,27,.95));
+}
+:root:not([data-theme=dark]) .top.slim{
+  background-image:linear-gradient(105deg,#c8102e,#790b20);
+  box-shadow:0 4px 20px rgba(80,8,22,.24);
+}
+:root[data-theme=dark] .top{
+  background-color:#5d1020;
+  background-image:linear-gradient(112deg,rgba(112,12,34,.97),rgba(51,22,29,.97));
+}
+:root[data-theme=dark] .top.slim{
+  background-image:linear-gradient(105deg,#761127,#3d1c24);
+}
+:root:not([data-theme=dark]) h2{color:#671122}
+:root:not([data-theme=dark]) h2::before{background:#d5a928}
+:root:not([data-theme=dark]) .btn:not(.ghost){
+  background:linear-gradient(135deg,#d51b39,#a90d29);
+  box-shadow:0 4px 12px rgba(169,13,41,.2);
+}
+:root:not([data-theme=dark]) .btn:not(.ghost):hover{
+  box-shadow:0 6px 15px rgba(169,13,41,.27);
+}
+:root:not([data-theme=dark]) .day[aria-pressed=true],
+:root:not([data-theme=dark]) .slot[aria-pressed=true]{
+  background:linear-gradient(145deg,#d51b39,#a90d29);
+  border-color:#a90d29;
+}
+:root:not([data-theme=dark]) .bar{
+  background:linear-gradient(100deg,#830c22,#4e101d);
+  box-shadow:0 -6px 20px rgba(80,8,22,.2);
+}
+.top h1::before{
+  content:"MU";
+  display:inline-grid;
+  place-items:center;
+  width:48px;
+  height:52px;
+  margin-right:12px;
+  border:2px solid #f1c75b;
+  border-radius:14px 14px 18px 18px;
+  background:linear-gradient(145deg,#e21b3c,#870a20);
+  box-shadow:0 3px 12px rgba(0,0,0,.24),inset 0 0 0 3px rgba(255,255,255,.12);
+  color:#ffe49a;
+  font:700 19px/1 'Barlow Condensed',sans-serif;
+  vertical-align:middle;
+  clip-path:polygon(0 0,100% 0,100% 72%,50% 100%,0 72%);
+}
+:root:not([data-theme=dark]) .top.slim h1::before{
+  content:"MU";
+  width:39px;
+  height:42px;
+  border:1.5px solid #f1c75b;
+  border-radius:11px 11px 14px 14px;
+  background:linear-gradient(145deg,#e21b3c,#870a20);
+  color:#ffe49a;
+  font-size:16px;
+  clip-path:polygon(0 0,100% 0,100% 72%,50% 100%,0 72%);
+}
+.site-footer{
+  position:fixed;
+  z-index:1;
+  left:50%;
+  bottom:8px;
+  width:76px;
+  height:72px;
+  transform:translateX(-50%);
+  border:1px solid #b39242;
+  border-radius:13px 13px 20px 20px;
+  background-color:#10090c;
+  background-image:linear-gradient(rgba(12,5,8,.12),rgba(12,5,8,.2)),url("../united-footer-banner.png");
+  background-position:center,center;
+  background-repeat:no-repeat;
+  background-size:100% 100%,270px 90px;
+  pointer-events:none;
+  box-shadow:0 3px 14px rgba(0,0,0,.4);
+}
+:root[data-theme=dark] .site-footer{
+  background-image:linear-gradient(rgba(8,3,6,.22),rgba(8,3,6,.3)),url("../united-footer-banner.png");
+}
+@media(max-width:600px){
+  body{padding-bottom:78px}
+  .site-footer{width:68px;height:64px;background-size:100% 100%,240px 80px}
+}

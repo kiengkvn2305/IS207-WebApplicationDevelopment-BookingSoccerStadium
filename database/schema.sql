@@ -12,6 +12,7 @@ CREATE TABLE users (
   password_hash VARCHAR(255) NOT NULL,
   role ENUM('customer','owner','admin') NOT NULL DEFAULT 'customer',
   status ENUM('active','pending','locked') NOT NULL DEFAULT 'active', -- owner mới đăng ký = pending, chờ admin duyệt
+  profile_version INT UNSIGNED NOT NULL DEFAULT 1,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_role_status (role, status)
 ) ENGINE=InnoDB;
@@ -21,9 +22,12 @@ CREATE TABLE owner_profiles (
   user_id INT UNSIGNED PRIMARY KEY,
   venue_name VARCHAR(100) NOT NULL,
   address VARCHAR(200) NULL,
+  latitude DECIMAL(10,7) NULL,
+  longitude DECIMAL(10,7) NULL,
   bank_bin CHAR(6) NULL,
   account_no VARCHAR(19) NULL,
   account_name VARCHAR(60) NULL,
+  profile_version INT UNSIGNED NOT NULL DEFAULT 1,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
@@ -38,6 +42,23 @@ CREATE TABLE pitches (
   FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+CREATE TABLE vouchers (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  code VARCHAR(32) NOT NULL UNIQUE,
+  discount_type ENUM('percent','fixed') NOT NULL,
+  discount_value INT UNSIGNED NOT NULL,
+  min_total INT UNSIGNED NOT NULL DEFAULT 0,
+  starts_at DATETIME NOT NULL,
+  ends_at DATETIME NOT NULL,
+  usage_limit INT UNSIGNED NULL,
+  usage_count INT UNSIGNED NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (created_by) REFERENCES users(id),
+  INDEX idx_vouchers_active_dates (active,starts_at,ends_at)
+) ENGINE=InnoDB;
+
 CREATE TABLE bookings (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   code CHAR(8) NOT NULL UNIQUE,
@@ -47,6 +68,9 @@ CREATE TABLE bookings (
   start_hour TINYINT UNSIGNED NOT NULL,
   end_hour TINYINT UNSIGNED NOT NULL,
   total INT UNSIGNED NOT NULL,
+  subtotal INT UNSIGNED NOT NULL DEFAULT 0,
+  discount INT UNSIGNED NOT NULL DEFAULT 0,
+  voucher_id INT UNSIGNED NULL,
   status ENUM('pending','confirmed','cancel_fee_pending','paid','cancelled','expired') NOT NULL DEFAULT 'confirmed',
   refund_status ENUM('none','pending','done') NOT NULL DEFAULT 'none',
   refund_amount INT UNSIGNED NOT NULL DEFAULT 0,
@@ -60,6 +84,7 @@ CREATE TABLE bookings (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id),
   FOREIGN KEY (pitch_id) REFERENCES pitches(id),
+  FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL,
   INDEX idx_user (user_id), INDEX idx_pitch_date (pitch_id, date), INDEX idx_status_exp (status, expires_at)
 ) ENGINE=InnoDB;
 
@@ -71,6 +96,35 @@ CREATE TABLE booking_slots (
   hour TINYINT UNSIGNED NOT NULL,
   PRIMARY KEY (pitch_id, date, hour),
   FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE unavailable_slots (
+  pitch_id INT UNSIGNED NOT NULL,
+  date DATE NOT NULL,
+  hour TINYINT UNSIGNED NOT NULL,
+  reason VARCHAR(255) NULL,
+  PRIMARY KEY (pitch_id, date, hour),
+  FOREIGN KEY (pitch_id) REFERENCES pitches(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE venue_amenities (
+  owner_id INT UNSIGNED NOT NULL,
+  amenity VARCHAR(80) NOT NULL,
+  PRIMARY KEY (owner_id,amenity),
+  FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE voucher_redemptions (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  voucher_id INT UNSIGNED NOT NULL,
+  booking_id INT UNSIGNED NOT NULL UNIQUE,
+  user_id INT UNSIGNED NOT NULL,
+  discount INT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (voucher_id) REFERENCES vouchers(id),
+  FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  INDEX idx_voucher_redemptions_user (voucher_id,user_id)
 ) ENGINE=InnoDB;
 
 -- Lịch sử xác nhận thanh toán (chủ sân bấm xác nhận đã nhận tiền)
