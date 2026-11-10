@@ -13,7 +13,6 @@ $r->add('POST', '/api/register', 'AuthController', 'register');
 $r->add('POST', '/api/logout',   'AuthController', 'logout');
 $r->add('POST', '/api/profile',  'AuthController', 'updateProfile');
 $r->add('GET',  '/api/notifications', 'NotificationController', 'list');
-$r->add('GET',  '/api/notifications/ws-ticket', 'NotificationController', 'wsTicket');
 $r->add('POST', '/api/notifications/read', 'NotificationController', 'markRead');
 $r->add('POST', '/api/notifications/read-all', 'NotificationController', 'markAllRead');
 // --- API người đặt sân ---

@@ -23,6 +23,23 @@ C:\xampp\mysql\bin\mysql.exe -u root -p san_bong < migrate_booking_cancellation.
 
 Database cài mới đã có schema tương ứng trong `schema.sql`.
 
+### Stored routines quản lý giao dịch DB
+
+Ứng dụng dùng các stored procedure `sannha_tx_begin`, `sannha_tx_commit`,
+`sannha_tx_rollback` để quản lý ranh giới transaction và function
+`sannha_cancel_fee` để tính phí hủy 70% với cùng quy tắc làm tròn ở database.
+FUNCTION chỉ tính toán; trong MySQL/MariaDB, FUNCTION không được commit hoặc
+rollback transaction. Sau khi tạo database bằng `schema.sql`, hãy cài routine:
+
+```cmd
+cd /d C:\xampp\htdocs\san-bong-mvc
+C:\xampp\mysql\bin\mysql.exe -u root -p san_bong < database\migrate_transaction_routines.sql
+```
+
+Migration có thể chạy lại an toàn. Các thao tác đặt sân, thanh toán, hủy lịch,
+voucher, kèo, đăng ký tài khoản và cập nhật ảnh/tiện ích dùng chung các routine
+này thông qua lớp `Database`.
+
 Để bật chức năng đá vãng lai trên database hiện có, chạy một lần migration:
 
 ```cmd
@@ -43,29 +60,6 @@ C:\xampp\mysql\bin\mysql.exe -u root -p san_bong < migrate_notifications.sql
 cd /d C:\xampp\htdocs\san-bong-mvc\database
 C:\xampp\mysql\bin\mysql.exe -u root -p san_bong < migrate_concurrency_safety.sql
 ```
-
-### Thông báo WebSocket thời gian thực
-
-WebSocket chạy như một tiến trình riêng, mặc định trên `127.0.0.1:3001`. Cấu hình trong `.env`:
-
-```env
-NOTIFICATION_WS_SECRET=<ít nhất 32 byte ngẫu nhiên>
-NOTIFICATION_WS_URL=ws://localhost:3001
-NOTIFICATION_WS_PORT=3001
-```
-
-Tạo secret bằng `C:\xampp\php\php.exe -r "echo bin2hex(random_bytes(32)), PHP_EOL;"`, thêm vào `.env`, sau đó cài và chạy:
-
-```cmd
-cd /d C:\xampp\htdocs\san-bong-mvc\websocket
-npm install
-npm start
-```
-
-Khi publish bằng ngrok, mở thêm một cửa sổ terminal và chạy `ngrok http 3001`. Đặt
-`NOTIFICATION_WS_URL=wss://<domain-ngrok-thu-hai>` trong `.env` (restart Apache và WebSocket server sau khi sửa).
-Trang web ký ticket dùng một lần, ràng buộc theo tài khoản và origin; WebSocket từ chối origin không khớp.
-Nếu WebSocket chưa chạy/cấu hình, giao diện tiếp tục cập nhật thông báo bằng polling.
 
 Để bật lọc giá/vị trí, lý do khóa khung giờ và voucher trên database hiện có,
 chạy migration sau khi đã áp dụng các migration `migrate_pitch_availability.sql`,

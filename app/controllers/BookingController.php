@@ -248,7 +248,6 @@ class BookingController extends Controller {
     function cancelMatch(): void {
         $user = $this->guard(['customer']); $id = (int)($this->body()['challenge_id'] ?? 0);
         if (!MatchChallenge::cancel($id, (int)$user['id'])) Http::error('Chỉ người tạo mới có thể đóng kèo đang mở.', 409);
-        Notification::notifyChallengeApplicants($id, 'Kèo giao hữu đã đóng', 'Đội tạo kèo đã đóng kèo này.');
         Audit::log('match_cancel', "challenge #$id");
         Http::json(['ok' => true]);
     }

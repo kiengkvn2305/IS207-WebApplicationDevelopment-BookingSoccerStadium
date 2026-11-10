@@ -24,14 +24,21 @@ class User {
     static function create(string $name, string $email, string $phone, string $pw, string $role, string $venue): bool {
         $pdo = Database::pdo();
         try {
-            $pdo->beginTransaction();
+            Database::beginTransaction();
             Database::q("INSERT INTO users(name,email,phone,password_hash,role,status) VALUES(?,?,?,?,?,?)",
                 [$name, $email, $phone, password_hash($pw, PASSWORD_DEFAULT), $role, $role === 'owner' ? 'pending' : 'active']);
             $id = (int)$pdo->lastInsertId();
             if ($role === 'owner') Database::q("INSERT INTO owner_profiles(user_id,venue_name) VALUES(?,?)", [$id, mb_substr($venue, 0, 100)]);
-            $pdo->commit(); Audit::log('register', $role, $id);
+            Database::commit(); Audit::log('register', $role, $id);
             return true;
-        } catch (PDOException $e) { $pdo->rollBack(); return false; }   // trùng email
+        } catch (PDOException $e) {
+            if ($pdo->inTransaction()) Database::rollBack();
+            if ((string)$e->getCode() === '23000') return false;
+            throw $e;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) Database::rollBack();
+            throw $e;
+        }
     }
     static function failedAttempts(string $email, string $ip): int {
         return (int)Database::q("SELECT COUNT(*) FROM login_attempts WHERE created_at > NOW() - INTERVAL 15 MINUTE AND (email=? OR ip=?)", [$email, $ip])->fetchColumn();

@@ -31,15 +31,21 @@ class Pitch {
     }
     static function setUnavailable(int $id, int $uid, string $date, int $hour, string $reason): bool {
         $pdo = Database::pdo();
-        $pdo->beginTransaction();
-        $pitch = Database::q("SELECT id FROM pitches WHERE id=? AND owner_id=? FOR UPDATE", [$id, $uid])->fetch();
-        if (!$pitch) { $pdo->rollBack(); return false; }
-        if (Database::q("SELECT 1 FROM booking_slots WHERE pitch_id=? AND date=? AND hour=?", [$id, $date, $hour])->fetchColumn()) {
-            $pdo->rollBack(); return false;
+        Database::beginTransaction();
+        try {
+            $pitch = Database::q("SELECT id FROM pitches WHERE id=? AND owner_id=? FOR UPDATE", [$id, $uid])->fetch();
+            if (!$pitch) { Database::rollBack(); return false; }
+            if (Database::q("SELECT 1 FROM booking_slots WHERE pitch_id=? AND date=? AND hour=?", [$id, $date, $hour])->fetchColumn()) {
+                Database::rollBack();
+                return false;
+            }
+            Database::q("INSERT IGNORE INTO unavailable_slots(pitch_id,date,hour,reason) VALUES(?,?,?,?)", [$id, $date, $hour, $reason]);
+            Database::commit();
+            return true;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) Database::rollBack();
+            throw $e;
         }
-        Database::q("INSERT IGNORE INTO unavailable_slots(pitch_id,date,hour,reason) VALUES(?,?,?,?)", [$id, $date, $hour, $reason]);
-        $pdo->commit();
-        return true;
     }
     static function saveImage(int $id, int $uid, string $path): bool {
         return Database::q("UPDATE pitches SET image_path=? WHERE id=? AND owner_id=?", [$path, $id, $uid])->rowCount() > 0;

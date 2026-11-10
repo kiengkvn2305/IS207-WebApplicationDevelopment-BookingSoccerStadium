@@ -107,10 +107,6 @@ const App = (() => {
     const list = center.querySelector('.notification-list');
     const readAll = center.querySelector('.notification-read-all');
     let loading = false;
-    let socket = null;
-    let reconnectDelay = 1000;
-    let reconnectTimer = null;
-    let lastId = 0;
 
     function render(data) {
       const count = Number(data.unread_count || 0);
@@ -119,7 +115,6 @@ const App = (() => {
       badge.textContent = count > 99 ? '99+' : String(count);
       badge.setAttribute('aria-label', `${count} thông báo chưa đọc`);
       readAll.disabled = count === 0;
-      lastId = Math.max(lastId, ...data.items.map(item => Number(item.id) || 0), 0);
       list.innerHTML = data.items.length ? data.items.map(item => {
         const time = new Date(String(item.created_at).replace(' ', 'T') + '+07:00');
         const dateText = Number.isNaN(time.getTime()) ? esc(item.created_at) : esc(time.toLocaleString('vi-VN'));
@@ -146,47 +141,6 @@ const App = (() => {
       } finally {
         loading = false;
       }
-    }
-    async function connectWebSocket() {
-      try {
-        const initial = await refresh();
-        if (!initial) {
-          scheduleReconnect();
-          return;
-        }
-        const connection = await api(`notifications/ws-ticket?since_id=${lastId}`);
-        const candidate = new WebSocket(connection.url);
-        socket = candidate;
-        candidate.addEventListener('open', () => {
-          reconnectDelay = 1000;
-          candidate.send(JSON.stringify({ type: 'auth', ticket: connection.ticket }));
-        }, { once: true });
-        candidate.addEventListener('message', event => {
-          let message;
-          try { message = JSON.parse(event.data); }
-          catch (error) {
-            console.error('Invalid notification WebSocket message.', error);
-            return;
-          }
-          if (message.type === 'notification') refresh();
-        });
-        candidate.addEventListener('close', () => {
-          if (socket === candidate) socket = null;
-          scheduleReconnect();
-        }, { once: true });
-        candidate.addEventListener('error', () => candidate.close(), { once: true });
-      } catch (error) {
-        console.warn('Real-time notifications are unavailable; polling remains enabled.', error);
-        scheduleReconnect();
-      }
-    }
-    function scheduleReconnect() {
-      if (reconnectTimer || document.hidden) return;
-      reconnectTimer = window.setTimeout(() => {
-        reconnectTimer = null;
-        connectWebSocket();
-      }, reconnectDelay);
-      reconnectDelay = Math.min(reconnectDelay * 2, 30000);
     }
     toggle.addEventListener('click', async () => {
       const opening = panel.hidden;
@@ -227,11 +181,8 @@ const App = (() => {
         toggle.setAttribute('aria-expanded', 'false');
       }
     });
-    connectWebSocket();
+    refresh();
     window.setInterval(() => { if (!document.hidden) refresh(); }, 30000);
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && !socket) scheduleReconnect();
-    });
   }
   async function init() {
     let theme = localStorage.getItem('sannha-theme') === 'dark' ? 'dark' : 'light';

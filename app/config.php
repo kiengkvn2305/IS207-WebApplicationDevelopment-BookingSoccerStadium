@@ -6,8 +6,6 @@ define('DB_NAME', Env::get('DB_NAME', 'san_bong'));
 define('DB_USER', Env::get('DB_USER', 'root'));
 define('DB_PASS', Env::get('DB_PASS', ''));
 define('SEPAY_WEBHOOK_SECRET', Env::get('SEPAY_WEBHOOK_SECRET'));
-define('NOTIFICATION_WS_URL', Env::get('NOTIFICATION_WS_URL'));
-define('NOTIFICATION_WS_SECRET', Env::get('NOTIFICATION_WS_SECRET'));
 define('APP_DEBUG', filter_var(Env::get('APP_DEBUG', 'false'), FILTER_VALIDATE_BOOLEAN));
 
 // Quy tắc nghiệp vụ (không nhạy cảm, có thể commit)
