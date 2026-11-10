@@ -166,7 +166,7 @@
     const id = +b.dataset.id;
     if (b.dataset.act === 'pitch-toggle') send('owner/pitch-toggle', { id }, 'Đã cập nhật trạng thái sân.');
     if (b.dataset.act === 'confirm-paid') send('owner/confirm-paid', { id }, 'Đã xác nhận nhận tiền.');
-    if (b.dataset.act === 'confirm-cancel-fee' && confirm('Chỉ xác nhận nếu đã kiểm tra và nhận đủ phí hủy trong tài khoản ngân hàng.')) {
+    if (b.dataset.act === 'confirm-cancel-fee' && confirm('Chỉ xác nhận sau khi đã kiểm tra và nhận đủ khoản phí hủy do khách chuyển bằng mã QR.')) {
       send('owner/confirm-cancel-fee', { id }, 'Đã xác nhận phí hủy; khung giờ đã được mở lại.');
     }
     if (b.dataset.act === 'refund-done') send('owner/refund-done', { id }, 'Đã đánh dấu hoàn tiền.');

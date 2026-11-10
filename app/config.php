@@ -6,6 +6,7 @@ define('DB_NAME', Env::get('DB_NAME', 'san_bong'));
 define('DB_USER', Env::get('DB_USER', 'root'));
 define('DB_PASS', Env::get('DB_PASS', ''));
 define('SEPAY_WEBHOOK_SECRET', Env::get('SEPAY_WEBHOOK_SECRET'));
+define('APP_DEBUG', filter_var(Env::get('APP_DEBUG', 'false'), FILTER_VALIDATE_BOOLEAN));
 
 // Quy tắc nghiệp vụ (không nhạy cảm, có thể commit)
 const HOLD_MINUTES = 1;       // giữ tương thích với các đơn chờ thanh toán cũ
