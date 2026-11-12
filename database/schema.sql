@@ -38,6 +38,7 @@ CREATE TABLE pitches (
   type VARCHAR(30) NOT NULL,
   price INT UNSIGNED NOT NULL,
   peak_price INT UNSIGNED NOT NULL,
+  image_path VARCHAR(255) NULL,
   active TINYINT(1) NOT NULL DEFAULT 1,
   FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
@@ -221,15 +222,83 @@ INSERT INTO owner_profiles (user_id,venue_name) VALUES (2,'Cụm sân Demo');  -
 INSERT INTO pitches (owner_id,name,type,price,peak_price) VALUES
  (2,'Sân A','Sân 5 người',200000,300000),(2,'Sân B','Sân 5 người',200000,300000),(2,'Sân C','Sân 7 người',350000,500000);
  
- SELECT * FROM bookings;
- SELECT * FROM audit_logs;
- DELETE FROM audit_logs;
- SELECT * FROM USERS;
- SELECT * FROM PITCHES;
- select * from bookings;
- delete from bookings;
- delete from pitches;
- DELETE FROM USERS
- WHERE phone = '0356539194';
- 
- commit;
+
+CREATE TABLE IF NOT EXISTS venue_images (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  owner_id INT UNSIGNED NOT NULL,
+  image_path VARCHAR(255) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_venue_images_owner (owner_id,id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS venue_reviews (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  owner_id INT UNSIGNED NOT NULL,
+  user_id INT UNSIGNED NOT NULL,
+  booking_id INT UNSIGNED NULL,
+  rating TINYINT UNSIGNED NOT NULL,
+  comment VARCHAR(1000) NOT NULL,
+  visible TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_venue_review_user (owner_id,user_id),
+  FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE,
+  INDEX idx_venue_reviews_public (owner_id,visible,created_at)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS sepay_webhook_events (
+  transaction_id BIGINT UNSIGNED PRIMARY KEY,
+  booking_id INT UNSIGNED NULL,
+  transfer_amount BIGINT UNSIGNED NOT NULL,
+  transfer_type ENUM('in','out') NOT NULL,
+  transaction_date DATETIME NOT NULL,
+  reference_code VARCHAR(100) NOT NULL DEFAULT '',
+  content VARCHAR(500) NOT NULL DEFAULT '',
+  status ENUM('received','paid','unmatched','ignored','amount_mismatch','late','already_paid','not_pending') NOT NULL DEFAULT 'received',
+  received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE SET NULL,
+  INDEX idx_sepay_booking_status (booking_id,status)
+) ENGINE=InnoDB;
+
+-- MariaDB/MySQL procedures centralize transaction boundaries used by the PHP models.
+-- Re-runnable: these routines are replaced on every migration run.
+DROP PROCEDURE IF EXISTS sannha_tx_begin;
+DROP PROCEDURE IF EXISTS sannha_tx_commit;
+DROP PROCEDURE IF EXISTS sannha_tx_rollback;
+DROP FUNCTION IF EXISTS sannha_cancel_fee;
+
+DELIMITER //
+
+CREATE PROCEDURE sannha_tx_begin()
+BEGIN
+  IF @@session.in_transaction <> 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A transaction is already active.';
+  END IF;
+  START TRANSACTION;
+END//
+
+CREATE PROCEDURE sannha_tx_commit()
+BEGIN
+  IF @@session.in_transaction = 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'No active transaction to commit.';
+  END IF;
+  COMMIT;
+END//
+
+CREATE PROCEDURE sannha_tx_rollback()
+BEGIN
+  IF @@session.in_transaction <> 0 THEN
+    ROLLBACK;
+  END IF;
+END//
+
+CREATE FUNCTION sannha_cancel_fee(total_amount INT UNSIGNED)
+RETURNS INT UNSIGNED
+DETERMINISTIC
+NO SQL
+RETURN FLOOR((CAST(total_amount AS DECIMAL(20,0)) * 70 + 50) / 100)//
+
+DELIMITER ;

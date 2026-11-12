@@ -1,12 +1,16 @@
 <?php
-class Database {
+
+class Database
+{
     private static ?PDO $pdo = null;
-    private static function callRoutine(string $routine): void {
+    private static function callRoutine(string $routine): void
+    {
         $statement = self::pdo()->query("CALL $routine()");
         $statement->closeCursor();
     }
 
-    static function pdo(): PDO {
+    public static function pdo(): PDO
+    {
         if (!self::$pdo) {
             self::$pdo = new PDO('mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';dbname=' . DB_NAME . ';charset=utf8mb4', DB_USER, DB_PASS, [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
@@ -18,7 +22,8 @@ class Database {
         return self::$pdo;
     }
 
-    static function beginTransaction(): bool {
+    public static function beginTransaction(): bool
+    {
         self::callRoutine('sannha_tx_begin');
         if (!self::pdo()->inTransaction()) {
             throw new RuntimeException('The database did not start the requested transaction.');
@@ -26,7 +31,8 @@ class Database {
         return true;
     }
 
-    static function commit(): bool {
+    public static function commit(): bool
+    {
         if (!self::pdo()->inTransaction()) {
             throw new LogicException('Cannot commit because no database transaction is active.');
         }
@@ -37,8 +43,11 @@ class Database {
         return true;
     }
 
-    static function rollBack(): bool {
-        if (!self::pdo()->inTransaction()) return false;
+    public static function rollBack(): bool
+    {
+        if (!self::pdo()->inTransaction()) {
+            return false;
+        }
         self::callRoutine('sannha_tx_rollback');
         if (self::pdo()->inTransaction()) {
             throw new RuntimeException('The database transaction is still active after rollback.');
@@ -46,7 +55,10 @@ class Database {
         return true;
     }
 
-    static function q(string $sql, array $p = []): PDOStatement {
-        $st = self::pdo()->prepare($sql); $st->execute($p); return $st;
+    public static function q(string $sql, array $parameters = []): PDOStatement
+    {
+        $statement = self::pdo()->prepare($sql);
+        $statement->execute($parameters);
+        return $statement;
     }
 }

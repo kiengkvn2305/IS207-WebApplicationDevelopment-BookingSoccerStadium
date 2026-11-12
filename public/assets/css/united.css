@@ -1,0 +1,791 @@
+/* Shared Manchester United inspired design system. Loaded after structural styles. */
+:root,
+:root[data-theme='light'] {
+  --font-body: 'Be Vietnam Pro';
+  --font-heading: 'Barlow Condensed';
+  --turf: #da291c;
+  --turf-d: #9f1d14;
+  --card: #da291c;
+  --chalk: #f4f4f5;
+  --paper: #fff;
+  --ink: #18181b;
+  --mute: #62626c;
+  --line: #dddde2;
+  --surface-soft: #f7f7f8;
+  --gold: #fbe122;
+}
+:root[data-theme='dark'] {
+  --turf: #ff7468;
+  --turf-d: #da291c;
+  --card: #da291c;
+  --chalk: #090a0d;
+  --paper: #16171c;
+  --ink: #fafafa;
+  --mute: #b0b0bb;
+  --line: #34353e;
+  --surface-soft: #202127;
+  color-scheme: dark;
+}
+:root body.united {
+  background-color: var(--chalk);
+  background-image:
+    radial-gradient(ellipse at 100% 0%, rgba(218, 41, 28, 0.09), transparent 48%),
+    url('../stadium-lines.svg');
+  background-position:
+    top right,
+    center top;
+  background-size:
+    auto,
+    1600px 1100px;
+  background-repeat: no-repeat, repeat-y;
+  color: var(--ink);
+  padding-bottom: 0;
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+body.united h1,
+body.united h2,
+body.united h3,
+body.united h4 {
+  font-family: var(--font-heading), sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+}
+body.united button,
+body.united input,
+body.united select,
+body.united textarea {
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+body.united input,
+body.united .stats,
+body.united .slot,
+body.united table {
+  font-variant-numeric: tabular-nums;
+}
+body.united .wrap {
+  max-width: 1240px;
+  padding-inline: 32px;
+}
+body.united main {
+  min-height: 65vh;
+  padding-bottom: 64px;
+}
+body.united .top,
+body.united .top.slim {
+  background: #101114;
+  background-image: none;
+  border-bottom: 3px solid #da291c;
+  padding: 18px 0;
+  box-shadow: none;
+  overflow: visible;
+}
+body.united .top::before,
+body.united .top::after,
+body.united .top h1::before {
+  display: none;
+}
+body.united::before {
+  display: none;
+}
+body.united a {
+  color: var(--turf);
+}
+body.united .top h1 {
+  font-size: 30px;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+body.united .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #fff;
+}
+body.united .top .brand {
+  color: #fff;
+}
+body.united .brand img {
+  width: 44px;
+  height: 48px;
+  object-fit: contain;
+}
+body.united .brand small {
+  display: block;
+  color: #b5b5be;
+  font:
+    500 10px/1.5 system-ui,
+    sans-serif;
+  letter-spacing: 0.17em;
+}
+body.united .who {
+  gap: 8px;
+}
+body.united .btn {
+  border-radius: 6px;
+  min-height: 44px;
+  padding: 11px 18px;
+  font-weight: 600;
+  transition:
+    background 0.15s,
+    transform 0.15s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+body.united .btn:not(.ghost),
+body.united .stack .btn {
+  background: #da291c;
+  color: white;
+  box-shadow: none;
+}
+body.united .btn:not(.ghost):hover {
+  background: #b82318;
+  box-shadow: none;
+}
+body.united .btn.ghost {
+  color: var(--ink);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  box-shadow: none;
+}
+body.united .top .btn.ghost {
+  color: #f5f5f5;
+  background: transparent;
+  border-color: #45454c;
+}
+body.united :focus-visible {
+  outline: 3px solid var(--turf);
+  outline-offset: 4px;
+}
+body.united .hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin: 0;
+  min-height: 480px;
+  display: flex;
+  align-items: center;
+  background: #101114;
+  color: #fff;
+  padding: 72px 52px;
+  border-radius: 0 0 12px 12px;
+  border-bottom: 4px solid #da291c;
+}
+body.united .hero-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 54%;
+  z-index: -2;
+}
+body.united .hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(9, 10, 13, 0.96),
+    rgba(9, 10, 13, 0.78) 45%,
+    rgba(9, 10, 13, 0.18)
+  );
+  z-index: -1;
+}
+body.united .hero-copy {
+  max-width: 600px;
+}
+body.united .eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--turf);
+}
+body.united .hero .eyebrow {
+  color: #fbe122;
+  margin: 0 0 18px;
+}
+body.united .hero h2 {
+  color: #fff;
+  font-size: clamp(44px, 6vw, 80px);
+  line-height: 1.05;
+  letter-spacing: 0;
+  display: block;
+  margin-bottom: 24px;
+}
+body.united .hero h2::before {
+  display: none;
+}
+body.united .hero h2 span {
+  color: #ff7468;
+}
+body.united .hero-copy > p:not(.eyebrow) {
+  color: #dedee3;
+  font-size: 17px;
+  max-width: 440px;
+}
+body.united .hero-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+}
+body.united .hero .btn.ghost {
+  color: #fff;
+  background: rgba(16, 17, 20, 0.7);
+  border-color: #74747c;
+}
+body.united .hero-note {
+  display: block;
+  margin-top: 24px;
+  color: #d5d5dd;
+  font-size: 13px;
+}
+body.united .booking-benefits {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-bottom: 1px solid var(--line);
+  padding: 24px 0;
+  gap: 24px;
+}
+body.united .booking-benefits div {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+body.united .booking-benefits b {
+  color: var(--turf);
+  font:
+    700 24px var(--font-heading),
+    sans-serif;
+}
+body.united .booking-benefits p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--mute);
+}
+body.united .booking-benefits strong {
+  display: block;
+  font-size: 16px;
+  color: var(--ink);
+}
+body.united h2 {
+  color: var(--ink);
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+body.united h2::before {
+  background: #da291c;
+}
+body.united h3,
+body.united .venue-card-title,
+body.united .venue-details h3 {
+  color: var(--ink);
+}
+body.united section {
+  scroll-margin-top: 24px;
+}
+body.united .panel,
+body.united .search-filters,
+body.united .pitch,
+body.united .venue-card,
+body.united .venue-details,
+body.united .booking,
+body.united .tablewrap,
+body.united .stats div,
+body.united .top-rated-card,
+body.united .match-card,
+body.united .booking-card,
+body.united .review-card {
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: none;
+  border-radius: 10px;
+}
+body.united input,
+body.united select,
+body.united textarea {
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  min-height: 44px;
+  border-radius: 6px;
+}
+body.united input::placeholder,
+body.united textarea::placeholder {
+  color: var(--mute);
+}
+body.united .hint,
+body.united .period-label,
+body.united .venue-card-address,
+body.united td small {
+  color: var(--mute);
+}
+body.united .search-filters {
+  padding: 24px;
+  gap: 16px;
+}
+body.united .day,
+body.united .calendar-days .day,
+body.united .slot,
+body.united .chip,
+body.united .schedule-slot {
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: none;
+}
+body.united .day[aria-pressed='true'],
+body.united .calendar-days .day[aria-pressed='true'],
+body.united .slot[aria-pressed='true'],
+body.united .chip[aria-pressed='true'] {
+  background: #da291c;
+  border-color: #da291c;
+  color: #fff;
+  box-shadow: none;
+}
+body.united .day[aria-pressed='true'] span,
+body.united .slot[aria-pressed='true'] small {
+  color: #fff;
+}
+body.united .day span,
+body.united .slot small {
+  color: var(--mute);
+}
+body.united .slot:hover:not(:disabled) {
+  background: var(--surface-soft);
+  border-color: var(--turf);
+  transform: none;
+}
+body.united .slot[aria-pressed='true']:hover {
+  background: #b82318;
+}
+body.united .slot.booked,
+body.united .slot.unavailable,
+body.united .schedule-slot:disabled {
+  background: var(--surface-soft);
+  color: var(--mute);
+  border-style: dashed;
+}
+body.united .availability,
+body.united .availability-summary,
+body.united .summary,
+body.united th {
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+body.united .venue-card-action,
+body.united .venue-contact {
+  color: var(--turf);
+}
+body.united #pitches:has(> .venue-card) {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+body.united .venue-card {
+  overflow: hidden;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+body.united .venue-card-image {
+  width: 100%;
+  height: 190px;
+  object-fit: cover;
+  display: block;
+}
+body.united .venue-card-placeholder {
+  height: 120px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-soft);
+  color: var(--mute);
+  font-size: 14px;
+}
+body.united .venue-card-open {
+  padding: 20px;
+  flex: 1;
+  text-align: left;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  cursor: pointer;
+}
+body.united .venue-card-title {
+  font-size: 24px;
+}
+body.united .venue-card-price {
+  display: block;
+  color: var(--ink);
+  margin: 14px 0;
+  font-size: 16px;
+}
+body.united .venue-contact {
+  padding: 0 20px 20px;
+  font-size: 13px;
+}
+body.united .venue-contact {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+body.united .venue-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--turf);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+body.united dialog {
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  max-height: 90dvh;
+  overflow: auto;
+}
+body.united dialog::backdrop {
+  background: rgba(9, 10, 13, 0.75);
+}
+body.united .bar {
+  background: #101114;
+  box-shadow: 0 -1px 0 #444;
+  z-index: 30;
+}
+body.united .bar small {
+  color: #dedee3;
+}
+body.united .account-dropdown,
+body.united .notification-panel,
+body.united .notification-heading {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--line);
+}
+body.united .notification-item.unread,
+body.united .notification-item:hover {
+  background: var(--surface-soft);
+}
+body.united .notification-panel {
+  width: min(430px, calc(100vw - 32px));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+}
+body.united .notification-heading {
+  align-items: center;
+  padding: 18px;
+  gap: 12px;
+}
+body.united .notification-heading > div {
+  display: grid;
+  gap: 2px;
+}
+body.united .notification-heading small {
+  color: var(--mute);
+  letter-spacing: 0.1em;
+  font-size: 10px;
+}
+body.united .notification-heading b {
+  font-family: var(--font-heading), sans-serif;
+  font-size: 25px;
+}
+body.united .notification-bulk-action {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--turf);
+  border-radius: 5px;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  max-width: 170px;
+  min-height: 44px;
+  cursor: pointer;
+}
+body.united .notification-bulk-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+body.united .notification-item {
+  display: block;
+  padding: 0;
+  border: 1px solid transparent;
+  border-bottom-color: var(--line);
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+body.united .notification-item.unread {
+  border-left: 3px solid #da291c;
+}
+body.united .notification-open {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  text-align: left;
+  padding: 14px 14px 4px;
+  font-size: 13px;
+  line-height: 1.65;
+  cursor: pointer;
+}
+body.united .notification-item-title {
+  font-weight: 600;
+}
+body.united .notification-item-message {
+  font-size: 12px;
+  color: var(--mute);
+}
+body.united .notification-open time {
+  color: var(--mute);
+  font-size: 11px;
+}
+body.united .notification-read-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 14px;
+  min-height: 44px;
+  color: var(--turf);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+body.united .notification-read-toggle input {
+  width: 17px;
+  height: 17px;
+  min-height: 17px;
+  margin: 0;
+  accent-color: #da291c;
+  cursor: pointer;
+}
+body.united .notification-help {
+  margin: 0;
+  border-top: 1px solid var(--line);
+  padding: 12px 18px;
+  color: var(--mute);
+  font-size: 11px;
+}
+body.united .notification-error {
+  margin: 10px 18px;
+  font-size: 12px;
+}
+body.united .error {
+  color: #bb2117;
+}
+:root[data-theme='dark'] body.united .error {
+  color: #ff9187;
+}
+body.united .dashboard-heading {
+  padding: 36px 0 12px;
+}
+body.united .dashboard-heading h2 {
+  font-size: 40px;
+}
+body.united .dashboard-nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+body.united .dashboard-nav a {
+  color: var(--ink);
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: 5px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+body.united .dashboard-nav a:hover {
+  border-color: var(--turf);
+}
+@media (min-width: 1100px) {
+  body.united:has(.dashboard-heading) main.wrap {
+    padding-left: 240px;
+    position: relative;
+  }
+  body.united .dashboard-nav {
+    position: absolute;
+    left: 32px;
+    top: 44px;
+    width: 180px;
+    display: flex;
+    flex-direction: column;
+    border: 0;
+    gap: 8px;
+  }
+}
+body.united .stats {
+  gap: 16px;
+}
+body.united .stats div {
+  padding: 24px;
+  border-top: 3px solid #da291c;
+}
+body.united .stats b {
+  font-size: 36px;
+  color: var(--ink);
+}
+body.united .tablewrap {
+  max-width: 100%;
+}
+body.united th {
+  padding: 16px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+body.united td {
+  padding: 16px;
+  overflow-wrap: anywhere;
+}
+body.united .narrow {
+  max-width: 500px;
+  padding-top: 40px;
+}
+body.united .theme-dock {
+  position: static;
+  margin-top: 16px;
+}
+body.united .voucher-entry {
+  background: var(--surface-soft);
+  border-color: var(--line);
+}
+body.united .stack {
+  padding: 28px;
+}
+body.united .site-footer {
+  position: static;
+  transform: none;
+  width: auto;
+  height: auto;
+  pointer-events: auto;
+  border: 0;
+  border-top: 1px solid #34353e;
+  border-radius: 0;
+  background: #101114;
+  background-image: none;
+  box-shadow: none;
+  color: #b5b5be;
+  padding: 32px;
+  text-align: center;
+  font-size: 13px;
+}
+body.united .site-footer strong {
+  color: #fff;
+  display: block;
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+body.united .site-footer p {
+  margin: 6px auto;
+  max-width: 720px;
+}
+body.united .site-footer a {
+  color: #e4e4e7;
+}
+body.united .site-footer .asset-credit {
+  font-size: 11px;
+  margin-top: 18px;
+}
+@media (min-width: 1500px) {
+  body.united .hero {
+    min-height: 500px;
+  }
+}
+@media (max-width: 1000px) {
+  body.united #pitches:has(> .venue-card) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  body.united .navrow {
+    align-items: flex-start;
+  }
+  body.united .who {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 600px) {
+  body.united .wrap {
+    padding-inline: 16px;
+  }
+  body.united .top h1 {
+    font-size: 24px;
+  }
+  body.united .brand img {
+    width: 34px;
+    height: 38px;
+  }
+  body.united .who {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+  body.united .top .btn {
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+  body.united .hero {
+    min-height: 440px;
+    padding: 40px 24px;
+  }
+  body.united .hero::before {
+    background: rgba(9, 10, 13, 0.78);
+  }
+  body.united .hero h2 {
+    font-size: 44px;
+  }
+  body.united .booking-benefits {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  body.united #pitches:has(> .venue-card) {
+    grid-template-columns: 1fr;
+  }
+  body.united .search-filters,
+  body.united .grid2 {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px;
+  }
+  body.united .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  body.united .stats div {
+    padding: 16px;
+  }
+  body.united .stats b {
+    font-size: 28px;
+    overflow-wrap: anywhere;
+  }
+  body.united .notification-panel {
+    position: fixed;
+    top: 156px;
+    left: 16px;
+    right: 16px;
+    width: auto;
+  }
+  body.united .site-footer {
+    padding: 28px 16px 100px;
+  }
+  body.united .actions {
+    flex-wrap: wrap;
+  }
+  body.united .slot {
+    min-height: 54px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.united *,
+  body.united *::before,
+  body.united *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
