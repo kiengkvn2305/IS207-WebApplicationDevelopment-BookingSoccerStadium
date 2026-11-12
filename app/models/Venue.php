@@ -1,6 +1,8 @@
 <?php
-class Venue {
-    const AMENITIES = [
+
+class Venue
+{
+    public const AMENITIES = [
         'parking' => 'Bãi đỗ xe',
         'toilet' => 'Nhà vệ sinh',
         'changing_room' => 'Phòng thay đồ',
@@ -11,8 +13,11 @@ class Venue {
         'wifi' => 'Wi-Fi',
     ];
 
-    static function imagesForOwners(array $ownerIds): array {
-        if (!$ownerIds) return [];
+    public static function imagesForOwners(array $ownerIds): array
+    {
+        if (!$ownerIds) {
+            return [];
+        }
         $marks = implode(',', array_fill(0, count($ownerIds), '?'));
         $result = [];
         foreach (Database::q("SELECT id,owner_id,image_path FROM venue_images WHERE owner_id IN ($marks) ORDER BY id", $ownerIds) as $row) {
@@ -24,8 +29,11 @@ class Venue {
         return $result;
     }
 
-    static function amenitiesForOwners(array $ownerIds): array {
-        if (!$ownerIds) return [];
+    public static function amenitiesForOwners(array $ownerIds): array
+    {
+        if (!$ownerIds) {
+            return [];
+        }
         $marks = implode(',', array_fill(0, count($ownerIds), '?'));
         $result = [];
         foreach (Database::q("SELECT owner_id,amenity FROM venue_amenities WHERE owner_id IN ($marks) ORDER BY amenity", $ownerIds) as $row) {
@@ -34,8 +42,11 @@ class Venue {
         return $result;
     }
 
-    static function summariesForOwners(array $ownerIds): array {
-        if (!$ownerIds) return [];
+    public static function summariesForOwners(array $ownerIds): array
+    {
+        if (!$ownerIds) {
+            return [];
+        }
         $marks = implode(',', array_fill(0, count($ownerIds), '?'));
         $result = [];
         foreach (Database::q("SELECT owner_id,ROUND(AVG(rating),1) average,COUNT(*) count
@@ -45,7 +56,8 @@ class Venue {
         return $result;
     }
 
-    static function topRated(int $limit = 6): array {
+    public static function topRated(int $limit = 6): array
+    {
         $rows = Database::q("SELECT o.user_id id,o.venue_name name,o.address,u.name owner_name,u.phone owner_phone,
             ROUND(r.average,1) rating_average,r.count rating_count,
             GROUP_CONCAT(DISTINCT p.type ORDER BY p.type SEPARATOR ', ') pitch_types
@@ -57,7 +69,7 @@ class Venue {
             WHERE o.account_no IS NOT NULL AND o.account_no<>''
             GROUP BY o.user_id,o.venue_name,o.address,u.name,u.phone,r.average,r.count
             ORDER BY r.average DESC,r.count DESC,o.venue_name LIMIT " . max(1, min($limit, 20)))->fetchAll();
-        $ids = array_map(fn($row) => (int)$row['id'], $rows);
+        $ids = array_map(fn ($row) => (int)$row['id'], $rows);
         $images = self::imagesForOwners($ids);
         $amenities = self::amenitiesForOwners($ids);
         foreach ($rows as &$row) {
@@ -72,11 +84,13 @@ class Venue {
         return $rows;
     }
 
-    static function images(int $ownerId): array {
+    public static function images(int $ownerId): array
+    {
         return Database::q("SELECT id,image_path FROM venue_images WHERE owner_id=? ORDER BY id", [$ownerId])->fetchAll();
     }
 
-    static function addImage(int $ownerId, string $path): bool {
+    public static function addImage(int $ownerId, string $path): bool
+    {
         $pdo = Database::pdo();
         Database::beginTransaction();
         try {
@@ -85,17 +99,23 @@ class Venue {
                 return false;
             }
             $count = (int)Database::q("SELECT COUNT(*) FROM venue_images WHERE owner_id=?", [$ownerId])->fetchColumn();
-            if ($count >= 8) { Database::rollBack(); return false; }
+            if ($count >= 8) {
+                Database::rollBack();
+                return false;
+            }
             Database::q("INSERT INTO venue_images(owner_id,image_path) VALUES(?,?)", [$ownerId, $path]);
             Database::commit();
             return true;
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) Database::rollBack();
+            if ($pdo->inTransaction()) {
+                Database::rollBack();
+            }
             throw $e;
         }
     }
 
-    static function deleteImage(int $imageId, int $ownerId): ?string {
+    public static function deleteImage(int $imageId, int $ownerId): ?string
+    {
         $pdo = Database::pdo();
         Database::beginTransaction();
         try {
@@ -103,8 +123,10 @@ class Venue {
                 Database::rollBack();
                 return null;
             }
-            $row = Database::q("SELECT image_path FROM venue_images WHERE id=? AND owner_id=? FOR UPDATE",
-                [$imageId, $ownerId])->fetch();
+            $row = Database::q(
+                "SELECT image_path FROM venue_images WHERE id=? AND owner_id=? FOR UPDATE",
+                [$imageId, $ownerId]
+            )->fetch();
             if (!$row) {
                 Database::rollBack();
                 return null;
@@ -113,13 +135,16 @@ class Venue {
             Database::commit();
             return $row['image_path'];
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) Database::rollBack();
+            if ($pdo->inTransaction()) {
+                Database::rollBack();
+            }
             throw $e;
         }
     }
 
-    static function saveAmenities(int $ownerId, array $amenities): void {
-        $amenities = array_values(array_unique(array_filter(array_map('trim', $amenities), fn($amenity) => $amenity !== '')));
+    public static function saveAmenities(int $ownerId, array $amenities): void
+    {
+        $amenities = array_values(array_unique(array_filter(array_map('trim', $amenities), fn ($amenity) => $amenity !== '')));
         $pdo = Database::pdo();
         Database::beginTransaction();
         try {
@@ -128,20 +153,26 @@ class Venue {
                 throw new RuntimeException('Không tìm thấy hồ sơ cụm sân.');
             }
             Database::q("DELETE FROM venue_amenities WHERE owner_id=?", [$ownerId]);
-            foreach ($amenities as $amenity) Database::q("INSERT INTO venue_amenities(owner_id,amenity) VALUES(?,?)", [$ownerId, $amenity]);
+            foreach ($amenities as $amenity) {
+                Database::q("INSERT INTO venue_amenities(owner_id,amenity) VALUES(?,?)", [$ownerId, $amenity]);
+            }
             Database::commit();
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) Database::rollBack();
+            if ($pdo->inTransaction()) {
+                Database::rollBack();
+            }
             throw $e;
         }
     }
 
-    static function amenities(int $ownerId): array {
+    public static function amenities(int $ownerId): array
+    {
         $rows = Database::q("SELECT amenity FROM venue_amenities WHERE owner_id=? ORDER BY amenity", [$ownerId])->fetchAll();
-        return array_map(fn($row) => self::AMENITIES[$row['amenity']] ?? $row['amenity'], $rows);
+        return array_map(fn ($row) => self::AMENITIES[$row['amenity']] ?? $row['amenity'], $rows);
     }
 
-    static function reviews(int $ownerId, ?int $userId): array {
+    public static function reviews(int $ownerId, ?int $userId): array
+    {
         $reviews = Database::q("SELECT r.id,r.rating,r.comment,r.created_at,u.name
             FROM venue_reviews r JOIN users u ON u.id=r.user_id WHERE r.owner_id=? AND r.visible=1
             ORDER BY r.created_at DESC,r.id DESC LIMIT 30", [$ownerId])->fetchAll();
@@ -157,15 +188,21 @@ class Venue {
         ];
     }
 
-    static function saveReview(int $ownerId, int $userId, int $rating, string $comment): bool {
-        if (!Database::q("SELECT user_id FROM owner_profiles WHERE user_id=?", [$ownerId])->fetchColumn()) return false;
-        Database::q("INSERT INTO venue_reviews(owner_id,user_id,booking_id,rating,comment)
+    public static function saveReview(int $ownerId, int $userId, int $rating, string $comment): bool
+    {
+        if (!Database::q("SELECT user_id FROM owner_profiles WHERE user_id=?", [$ownerId])->fetchColumn()) {
+            return false;
+        }
+        Database::q(
+            "INSERT INTO venue_reviews(owner_id,user_id,booking_id,rating,comment)
             VALUES(?,?,NULL,?,?) ON DUPLICATE KEY UPDATE rating=VALUES(rating),comment=VALUES(comment),updated_at=CURRENT_TIMESTAMP",
-            [$ownerId, $userId, $rating, $comment]);
+            [$ownerId, $userId, $rating, $comment]
+        );
         return true;
     }
 
-    static function adminReviews(): array {
+    public static function adminReviews(): array
+    {
         return Database::q("SELECT r.id,r.owner_id,r.rating,r.comment,r.visible,r.created_at,r.updated_at,
             c.name customer_name,o.venue_name
             FROM venue_reviews r JOIN users c ON c.id=r.user_id
@@ -173,7 +210,8 @@ class Venue {
             ORDER BY r.created_at DESC,r.id DESC LIMIT 100")->fetchAll();
     }
 
-    static function setReviewVisibility(int $id, bool $visible): bool {
+    public static function setReviewVisibility(int $id, bool $visible): bool
+    {
         return Database::q("UPDATE venue_reviews SET visible=? WHERE id=?", [$visible ? 1 : 0, $id])->rowCount() > 0;
     }
 }

@@ -1,5 +1,34 @@
 # IS207-WebApplicationDevelopment-BookingSoccerStadium
 
+Ứng dụng đặt sân PHP MVC, JavaScript thuần và MySQL/MariaDB. Không cần npm hoặc Composer để chạy website.
+
+## Chạy bằng XAMPP
+
+1. Bật **MySQL** và **Apache** trong XAMPP. PHP cần `pdo_mysql`, `mbstring`, `fileinfo` và session; đã kiểm tra bằng PHP 8.2.12 và MariaDB 10.4.32.
+2. Nếu chưa có cấu hình, sao chép [.env.example](.env.example) thành `.env`, điền thông tin database. Giữ `APP_DEBUG=false` khi public.
+3. **Chỉ với database cài mới, trống:** import [database/schema.sql](database/schema.sql) bằng phpMyAdmin hoặc lệnh sau trong **Command Prompt**:
+
+   ```cmd
+   cd /d C:\xampp\htdocs\san-bong-mvc
+   C:\xampp\mysql\bin\mysql.exe -u root -p < database\schema.sql
+   ```
+
+   Schema hiện đã chứa đủ bảng, cột và stored routines. Không chạy lại các migration cũ trên database vừa cài bằng schema này. Với database đang dùng, sao lưu và chỉ chạy migration còn thiếu theo lịch sử cài đặt; một số migration cũ không chạy lặp được.
+4. Mở `http://localhost/san-bong-mvc/public/`. Apache cần `mod_rewrite` và cho phép `.htaccess`. Khi cấu hình virtual host, trỏ DocumentRoot vào [public/](public/).
+5. Tài khoản seed phục vụ demo: `admin@sannha.vn` / `Admin@12345`; `chusan@sannha.vn` và `khach@sannha.vn` / `Demo@12345`. Đổi mật khẩu khi sử dụng ngoài môi trường demo. Chủ sân phải nhập đủ tài khoản ngân hàng để sân xuất hiện; ảnh và địa chỉ do chủ sân nhập.
+
+Có thể chạy PHP server từ thư mục dự án sau khi MySQL đã hoạt động:
+
+```powershell
+& C:/xampp/php/php.exe -S 127.0.0.1:8088 -t public public/index.php
+```
+
+Mở `http://127.0.0.1:8088/`. PHP server này chỉ dành cho phát triển.
+
+Xem [báo cáo rà soát và checklist demo](docs/PROJECT-REVIEW.md), [hướng dẫn kiểm thử độc lập](tests/README.md) và [nguồn/giấy phép hình ảnh](public/assets/ASSET-SOURCES.md).
+
+Đợt bổ sung ngày 13/11/2026: đọc/chưa đọc thông báo, typography/background, xác nhận thanh toán tại sân, hủy đơn 0 đồng và khóa duyệt kèo đồng thời. Xem [349 kiểm tra nghiệp vụ/HTTP và phạm vi xác nhận](docs/SYSTEM-VERIFICATION.md), cùng [quy chuẩn code để review](docs/CODING-STANDARDS.md).
+
 ## Theo dõi lỗi 500
 
 Lỗi không được xử lý sẽ được ghi vào PHP/Apache error log cùng mã `request_id`,

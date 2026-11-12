@@ -1,0 +1,9 @@
+# Asset sources
+
+- `old-trafford.jpg`: Old Trafford aerial photograph by **Arne Müseler**, from [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:2023_07_31_arne_mueseler_00060-Verbessert-RR_(53106651455).jpg), licensed [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/). Downloaded 2026-11-12 at 3840px. Displayed with CSS cropping and overlay; attribution and license are visible in the site footer. The photograph retains its license.
+- `manchester-united-crest.svg`: [Wikimedia-hosted Manchester United crest](https://en.wikipedia.org/wiki/File:Manchester_United_FC_crest.svg), downloaded 2026-11-12 without modification. Copyright/trademark belongs to its owner. Wikipedia's use does **not** grant a commercial license. Included for this educational project; obtain permission or replace the crest before commercial publication.
+- Earlier supplied matchday and footer PNGs remain in the repository but the redesigned pages no longer use them. Their provenance has not been verified.
+- `stadium-lines.svg`: original code-native line artwork created for this project, depicting pitch markings and stadium structure; no external photograph or logo was traced.
+- `fonts/`: **Be Vietnam Pro** 400/500/600/700 and **Barlow Condensed** 600/700, downloaded from Google Fonts on 2026-11-12. WOFF2 subsets include Vietnamese, latin-ext and latin. License files are included as `fonts/BeVietnamPro-OFL.txt` and `fonts/BarlowCondensed-OFL.txt`; both are SIL Open Font License 1.1. Source: [Be Vietnam Pro](https://github.com/google/fonts/tree/main/ofl/bevietnampro), [Barlow Condensed](https://github.com/google/fonts/tree/main/ofl/barlowcondensed). Served locally; family names and outlines are unmodified.
+
+Sân Nhà is an independent educational booking application. It is not an official Manchester United product or an endorsed service.

@@ -1,35 +1,122 @@
-<!DOCTYPE html>
-<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/style.css?v=united-pinned-logo"><title>Đăng nhập</title></head><body>
-<header class="top"><div class="wrap"><h1>Bóng đá quanh ta</h1><p>Đặt sân bóng mini, thanh toán bằng mã QR</p></div></header>
-<main class="wrap narrow">
-  <h2 id="title">Đăng nhập</h2>
-  <p id="flash" class="flash" hidden role="alert"></p>
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/css/style.css?v=united-2" />
+    <title>Đăng nhập</title>
+    <link rel="stylesheet" href="assets/css/united.css?v=1" />
+  </head>
+  <body class="united">
+    <header class="top">
+      <div class="wrap">
+        <h1>
+          <a class="brand" href="dat-san"
+            ><img
+              src="assets/manchester-united-crest.svg"
+              alt="Manchester United"
+              width="44"
+              height="48"
+            /><span>SÂN NHÀ<small>UNITED BY FOOTBALL</small></span></a
+          >
+        </h1>
+        <p>Sẵn sàng cho trận đấu tiếp theo của bạn.</p>
+      </div>
+    </header>
+    <main class="wrap narrow">
+      <h2 id="title">Đăng nhập</h2>
+      <p id="flash" class="flash" hidden role="alert"></p>
 
-  <form id="loginForm" class="panel stack">
-    <label>Email<input name="email" type="email" required autocomplete="email"></label>
-    <label>Mật khẩu<div class="password-control">
-      <input name="password" id="loginPassword" type="password" required autocomplete="current-password">
-      <button class="password-toggle" type="button" data-password-toggle="loginPassword" aria-label="Hiện mật khẩu">Hiện</button></div></label>
-    <button class="btn">Đăng nhập</button>
-    <p class="hint"><a href="#" id="toRegister">Chưa có tài khoản? Đăng ký</a></p>
-    <p class="hint">Bạn muốn xem sân trước? <a href="dat-san">Tìm sân còn chỗ</a></p>
-  </form>
+      <form id="loginForm" class="panel stack">
+        <label>Email<input name="email" type="email" required autocomplete="email" /></label>
+        <label
+          >Mật khẩu
+          <div class="password-control">
+            <input
+              name="password"
+              id="loginPassword"
+              type="password"
+              required
+              autocomplete="current-password"
+            />
+            <button
+              class="password-toggle"
+              type="button"
+              data-password-toggle="loginPassword"
+              aria-label="Hiện mật khẩu"
+            >
+              Hiện
+            </button>
+          </div></label
+        >
+        <button class="btn">Đăng nhập</button>
+        <p class="hint"><a href="#" id="toRegister">Chưa có tài khoản? Đăng ký</a></p>
+        <p class="hint">Bạn muốn xem sân trước? <a href="dat-san">Tìm sân còn chỗ</a></p>
+      </form>
 
-  <form id="registerForm" class="panel stack" hidden>
-    <label>Bạn là<select name="role" id="role"><option value="customer">Người đặt sân</option><option value="owner">Chủ sân</option></select></label>
-    <label>Họ và tên<input name="name" required maxlength="60" autocomplete="name"></label>
-    <label>Số điện thoại<input name="phone" type="tel" required pattern="(0|\+84)\d{9}" autocomplete="tel"></label>
-    <label id="venueRow" hidden>Tên cụm sân<input name="venue" maxlength="100"></label>
-    <label>Email<input name="email" type="email" required autocomplete="email"></label>
-    <label>Mật khẩu (tối thiểu 8 ký tự, có chữ và số)<div class="password-control">
-      <input name="password" id="registerPassword" type="password" required minlength="8" autocomplete="new-password">
-      <button class="password-toggle" type="button" data-password-toggle="registerPassword" aria-label="Hiện mật khẩu">Hiện</button></div></label>
-    <button class="btn">Đăng ký</button>
-    <p class="hint"><a href="#" id="toLogin">Đã có tài khoản? Đăng nhập</a></p>
-  </form>
-</main>
-<script src="assets/js/app.js"></script><script src="assets/js/login.js"></script>
-<footer class="site-footer" aria-label="Manchester United"></footer>
-</body></html>
+      <form id="registerForm" class="panel stack" hidden>
+        <label
+          >Bạn là<select name="role" id="role">
+            <option value="customer">Người đặt sân</option>
+            <option value="owner">Chủ sân</option>
+          </select></label
+        >
+        <label>Họ và tên<input name="name" required maxlength="60" autocomplete="name" /></label>
+        <label
+          >Số điện thoại<input
+            name="phone"
+            type="tel"
+            required
+            pattern="(0|\+84)\d{9}"
+            autocomplete="tel"
+        /></label>
+        <label id="venueRow" hidden>Tên cụm sân<input name="venue" maxlength="100" /></label>
+        <label>Email<input name="email" type="email" required autocomplete="email" /></label>
+        <label
+          >Mật khẩu (tối thiểu 8 ký tự, có chữ và số)
+          <div class="password-control">
+            <input
+              name="password"
+              id="registerPassword"
+              type="password"
+              required
+              minlength="8"
+              autocomplete="new-password"
+            />
+            <button
+              class="password-toggle"
+              type="button"
+              data-password-toggle="registerPassword"
+              aria-label="Hiện mật khẩu"
+            >
+              Hiện
+            </button>
+          </div></label
+        >
+        <button class="btn">Đăng ký</button>
+        <p class="hint"><a href="#" id="toLogin">Đã có tài khoản? Đăng nhập</a></p>
+      </form>
+    </main>
+    <script src="assets/js/notifications.js"></script>
+    <script src="assets/js/app.js"></script>
+    <script src="assets/js/login.js"></script>
+    <footer class="site-footer" aria-label="Thông tin nền tảng">
+      <strong>Sân Nhà · United by football.</strong>
+      <p>Chọn sân. Hẹn đội. Ra sân.</p>
+      <p>
+        Nền tảng độc lập lấy cảm hứng từ Manchester United, không liên kết hoặc được câu lạc bộ bảo
+        trợ. Nhãn hiệu thuộc chủ sở hữu tương ứng.
+      </p>
+      <p class="asset-credit">
+        Ảnh Old Trafford:
+        <a
+          href="https://commons.wikimedia.org/wiki/File:2023_07_31_arne_mueseler_00060-Verbessert-RR_(53106651455).jpg"
+          >Arne Müseler</a
+        >
+        / <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a> ·
+        <a href="dat-san">Tìm sân</a>
+      </p>
+    </footer>
+  </body>
+</html>

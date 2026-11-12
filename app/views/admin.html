@@ -1,16 +1,26 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css?v=united-pinned-logo">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/css/style.css?v=united-2" />
     <title>Quản trị viên</title>
+    <link rel="stylesheet" href="assets/css/united.css?v=1" />
   </head>
-  <body>
+  <body class="united">
     <header class="top slim">
       <div class="wrap navrow">
-        <h1>Sân Nhà</h1>
+        <h1>
+          <a class="brand" href="dat-san"
+            ><img
+              src="assets/manchester-united-crest.svg"
+              alt="Manchester United"
+              width="44"
+              height="48"
+            /><span>SÂN NHÀ<small>UNITED BY FOOTBALL</small></span></a
+          >
+        </h1>
         <div class="who">
           <span id="whoami"></span>
           <button class="btn ghost light" id="logoutBtn">Đăng xuất</button>
@@ -18,29 +28,103 @@
       </div>
     </header>
     <main class="wrap">
+      <div class="dashboard-heading">
+        <p class="eyebrow">SÂN NHÀ / QUẢN TRỊ HỆ THỐNG</p>
+        <h2>Trung tâm điều hành</h2>
+        <p class="hint">Theo dõi hoạt động, quản lý tài khoản và ưu đãi từ dữ liệu thực tế.</p>
+      </div>
+      <nav class="dashboard-nav" aria-label="Quản trị">
+        <a href="#overview">Tổng quan</a><a href="#vouchers">Voucher</a
+        ><a href="#accounts">Tài khoản</a><a href="#orders">Lịch đặt</a
+        ><a href="#reviews">Đánh giá</a><a href="#activity">Nhật ký</a>
+      </nav>
       <p id="flash" class="flash" hidden role="status"></p>
-        <section>
-          <h2>Tổng quan</h2>
-          <div class="stats" id="stats"></div>
-        </section>
-        <section><h2>Mã giảm giá</h2>
-          <p class="hint">Mỗi đơn chỉ dùng một mã. Hệ thống khóa lượt dùng trong giao dịch đặt sân và kiểm tra lại hạn dùng, giá trị tối thiểu, số lượt trước khi áp dụng.</p>
-          <form id="voucherForm" class="panel grid2">
-            <label>Mã voucher<input name="code" required maxlength="32" pattern="[A-Za-z0-9_-]+" autocomplete="off"></label>
-            <label>Loại giảm giá<select name="discount_type" id="voucherType"><option value="percent">Phần trăm</option><option value="fixed">Số tiền</option></select></label>
-            <label>Giá trị giảm<input name="discount_value" id="voucherValue" type="number" min="1" max="100" required></label>
-            <label>Đơn tối thiểu (đ)<input name="min_total" type="number" min="0" max="100000000" step="10000" value="0" required></label>
-            <label>Bắt đầu<input name="starts_at" id="voucherStarts" type="datetime-local" required></label>
-            <label>Kết thúc<input name="ends_at" id="voucherEnds" type="datetime-local" required></label>
-            <label>Số lượt tối đa (để trống = không giới hạn)<input name="usage_limit" type="number" min="1" max="1000000"></label>
-            <div class="end"><button class="btn">Tạo voucher</button></div>
-          </form>
-          <div class="tablewrap"><table>
-            <thead><tr><th>Mã</th><th>Mức giảm</th><th>Đơn tối thiểu</th><th>Thời hạn</th><th>Lượt dùng</th><th>Trạng thái</th><th></th></tr></thead>
+      <section>
+        <h2 id="overview">Tổng quan</h2>
+        <div class="stats" id="stats"></div>
+      </section>
+      <section>
+        <h2 id="vouchers">Mã giảm giá</h2>
+        <p class="hint">
+          Mỗi đơn chỉ dùng một mã. Hệ thống khóa lượt dùng trong giao dịch đặt sân và kiểm tra lại
+          hạn dùng, giá trị tối thiểu, số lượt trước khi áp dụng.
+        </p>
+        <form id="voucherForm" class="panel grid2">
+          <label
+            >Mã voucher<input
+              name="code"
+              required
+              minlength="3"
+              maxlength="32"
+              pattern="[A-Za-z0-9_\-]{3,32}"
+              autocomplete="off"
+          /></label>
+          <label
+            >Loại giảm giá<select name="discount_type" id="voucherType">
+              <option value="percent">Phần trăm</option>
+              <option value="fixed">Số tiền</option>
+            </select></label
+          >
+          <label
+            >Giá trị giảm<input
+              name="discount_value"
+              id="voucherValue"
+              type="number"
+              min="1"
+              max="100"
+              required
+          /></label>
+          <label
+            >Đơn tối thiểu (đ)<input
+              name="min_total"
+              type="number"
+              min="0"
+              max="100000000"
+              step="10000"
+              value="0"
+              required
+          /></label>
+          <label
+            >Bắt đầu<input name="starts_at" id="voucherStarts" type="datetime-local" required
+          /></label>
+          <label
+            >Kết thúc<input name="ends_at" id="voucherEnds" type="datetime-local" required
+          /></label>
+          <label
+            >Số lượt tối đa (để trống = không giới hạn)<input
+              name="usage_limit"
+              type="number"
+              min="1"
+              max="1000000"
+          /></label>
+          <div class="end"><button class="btn" type="submit">Tạo voucher</button></div>
+        </form>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Mã</th>
+                <th>Mức giảm</th>
+                <th>Đơn tối thiểu</th>
+                <th>Thời hạn</th>
+                <th>Lượt dùng</th>
+                <th>Trạng thái</th>
+                <th></th>
+              </tr>
+            </thead>
             <tbody id="voucherRows"></tbody>
-          </table></div>
-        </section>
-      <section><h2>Tài khoản</h2>
+          </table>
+        </div>
+      </section>
+      <section>
+        <h2 id="accounts">Tài khoản</h2>
+        <label
+          >Tìm tài khoản<input
+            id="accountSearch"
+            type="search"
+            placeholder="Tên, email, số điện thoại hoặc cụm sân"
+        /></label>
+        <p class="hint">Hiển thị tối đa 100 tài khoản gần nhất, ưu tiên chủ sân chờ duyệt.</p>
         <div class="tablewrap">
           <table>
             <thead>
@@ -56,7 +140,8 @@
           </table>
         </div>
       </section>
-      <section><h2>Đơn gần đây</h2>
+      <section>
+        <h2 id="orders">Đơn gần đây</h2>
         <div class="tablewrap">
           <table>
             <thead>
@@ -75,16 +160,30 @@
           </table>
         </div>
       </section>
-      <section><h2>Đánh giá khách hàng</h2>
-        <p class="hint">Ẩn đánh giá vi phạm hoặc hiển thị lại sau khi kiểm tra. Đánh giá chỉ được gửi bởi khách có đơn đã thanh toán.</p>
+      <section>
+        <h2 id="reviews">Đánh giá khách hàng</h2>
+        <p class="hint">
+          Ẩn đánh giá vi phạm hoặc hiển thị lại sau khi kiểm tra. Khách hàng đã đăng nhập có thể gửi
+          đánh giá.
+        </p>
         <div class="tablewrap">
           <table>
-            <thead><tr><th>Cụm sân</th><th>Khách hàng</th><th>Sao</th><th>Bình luận</th><th>Trạng thái</th><th></th></tr></thead>
+            <thead>
+              <tr>
+                <th>Cụm sân</th>
+                <th>Khách hàng</th>
+                <th>Sao</th>
+                <th>Bình luận</th>
+                <th>Trạng thái</th>
+                <th></th>
+              </tr>
+            </thead>
             <tbody id="reviewRows"></tbody>
           </table>
         </div>
       </section>
-      <section><h2>Nhật ký hoạt động</h2>
+      <section>
+        <h2 id="activity">Nhật ký hoạt động</h2>
         <div class="tablewrap">
           <table>
             <thead>
@@ -101,6 +200,25 @@
         </div>
       </section>
     </main>
-<script src="assets/js/app.js"></script><script src="assets/js/admin.js"></script>
-<footer class="site-footer" aria-label="Manchester United"></footer>
-</body></html>
+    <script src="assets/js/notifications.js"></script>
+    <script src="assets/js/app.js"></script>
+    <script src="assets/js/admin.js"></script>
+    <footer class="site-footer" aria-label="Thông tin nền tảng">
+      <strong>Sân Nhà · United by football.</strong>
+      <p>Chọn sân. Hẹn đội. Ra sân.</p>
+      <p>
+        Nền tảng độc lập lấy cảm hứng từ Manchester United, không liên kết hoặc được câu lạc bộ bảo
+        trợ. Nhãn hiệu thuộc chủ sở hữu tương ứng.
+      </p>
+      <p class="asset-credit">
+        Ảnh Old Trafford:
+        <a
+          href="https://commons.wikimedia.org/wiki/File:2023_07_31_arne_mueseler_00060-Verbessert-RR_(53106651455).jpg"
+          >Arne Müseler</a
+        >
+        / <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a> ·
+        <a href="dat-san">Tìm sân</a>
+      </p>
+    </footer>
+  </body>
+</html>
